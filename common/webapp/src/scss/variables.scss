@@ -28,18 +28,18 @@ $mobile-break: 575.98px;
 
 // themes
 @mixin dark-theme {
-  font-family: 'Quicksand', sans-serif;
+  font-family: 'Unifont', sans-serif;
   font-size: 16px;
   font-weight: 400;
 
-  --theme-bg: #181818;
-  --theme-bg-hover: #222;
-  --theme-bg-light: #444;
-  --theme-fg: #fff;
-  --theme-fg-light: #aaa;
+  --theme-bg: #ffffff00;
+  --theme-bg-hover: #c6c6c66e;
+  --theme-bg-light: #c0c0c0c4;
+  --theme-fg: #ffffff;
+  --theme-fg-light: #ffffff;
 
   //SwitchButton
-  --theme-switch-button-on: #00489d;
+  --theme-switch-button-on: #a2d9b2;
 
   //DayNightSwitch
   --theme-stars-day: #fff;
@@ -49,39 +49,39 @@ $mobile-break: 575.98px;
 }
 
 @mixin light-theme {
-  font-family: 'Quicksand', sans-serif;
-  font-size: 16px;
-  font-weight: 500;
-
-  --theme-bg: #eee;
-  --theme-bg-hover: #ddd;
-  --theme-bg-light: #999;
-  --theme-fg: #000;
-  --theme-fg-light: #333;
-
-  //SwitchButton
-  --theme-switch-button-on: #6593dc;
-
-  //DayNightSwitch
-  --theme-stars-day: #444;
-  --theme-moon-day: #000;
-  --theme-stars-night: #fff;
-  --theme-moon-night: #ff0;
-}
-
-@mixin contrast-theme {
-  font-family: 'Quicksand', sans-serif;
+  font-family: 'Unifont', sans-serif;
   font-size: 16px;
   font-weight: 400;
 
-  --theme-bg: #000;
-  --theme-bg-hover: #222;
-  --theme-bg-light: #666;
-  --theme-fg: #fff;
-  --theme-fg-light: #aaa;
+  --theme-bg: #ffffff00;
+  --theme-bg-hover: #c6c6c680;
+  --theme-bg-light: #c0c0c0c4;
+  --theme-fg: #ffffff;
+  --theme-fg-light: #ffffff;
 
   //SwitchButton
-  --theme-switch-button-on: #006fff;
+  --theme-switch-button-on: #a2d9b2;
+
+  //DayNightSwitch
+  --theme-stars-day: #fff;
+  --theme-moon-day: #ff0;
+  --theme-stars-night: #444;
+  --theme-moon-night: #000;
+}
+
+@mixin contrast-theme {
+  font-family: 'Unifont', sans-serif;
+  font-size: 16px;
+  font-weight: 400;
+
+  --theme-bg: #ffffff00;
+  --theme-bg-hover: #c6c6c6;
+  --theme-bg-light: #c0c0c0c4;
+  --theme-fg: #ffffff;
+  --theme-fg-light: #ffffff;
+
+  //SwitchButton
+  --theme-switch-button-on: #a2d9b2;
 
   //DayNightSwitch
   --theme-stars-day: #fff;

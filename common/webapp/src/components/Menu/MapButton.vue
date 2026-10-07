@@ -6,6 +6,8 @@
 </template>
 
 <script>
+import { playMapWrite } from '../../js/map/Sounds'; // 导入音效函数
+
 export default {
   name: "MapButton",
   props: {
@@ -24,7 +26,8 @@ export default {
   },
   methods: {
     switchMap(mapId) {
-      this.$bluemap.switchMap(mapId);
+      playMapWrite();                    // 播放地图切换音效
+      this.$bluemap.switchMap(mapId);    // 执行地图切换
     }
   }
 }

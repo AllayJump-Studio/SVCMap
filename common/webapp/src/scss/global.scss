@@ -24,11 +24,18 @@
  */
 
 @font-face {
-  font-family: 'Quicksand';
+  font-family: 'Unifont';
   font-style: normal;
   font-display: swap;
   font-weight: 100 900;
-  src: local("Quicksand"), url("./fonts/Quicksand.ttf") format('truetype-variations');
+  src: local("Unifont"), url("./fonts/unifont.ttf") format('truetype');
+}
+@font-face {
+  font-family: 'Minecraft';
+  font-style: normal;
+  font-display: swap;
+  font-weight: normal;
+  src: local("Minecraft"), url("./fonts/Minecraft.ttf") format('truetype');
 }
 
 @import "variables.scss";
@@ -63,6 +70,7 @@ body {
   padding: 0;
   overscroll-behavior: none;
   overflow: hidden;
+  font-family: 'Unifont', sans-serif;
 }
 
 h1, h2, h3, h4, h5, h6 {
@@ -184,6 +192,63 @@ input {
 
   }
 
+}
+
+/* ====== 默认深色 ====== */
+.control-bar,
+.zoom-button
+ {
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  background-color: lch(46.84% 0.01 296.81 / 0.702);
+  transition: background-color 0.2s ease;
+}
+
+.side-menu > .title
+ {
+  background-color: #ab792d;
+}
+
+.side-menu
+ {
+  backdrop-filter: blur(8px);
+  background-color: #7c5219b5;
+}
+
+/* ====== 浅色 ====== */
+.theme-light .control-bar,
+.theme-light .zoom-button
+ {
+  background-color: lch(46.84% 0.01 296.81 / 0.702);
+}
+
+.theme-light .side-menu > .title
+ {
+  background-color: #ab792d;
+}
+
+.theme-light .side-menu
+ {
+  backdrop-filter: blur(8px);
+  background-color: #7c5219b5;
+}
+
+/* 高对比度 */
+.theme-contrast .control-bar,
+.theme-contrast .zoom-button
+ {
+  background-color: lch(46.84% 0.01 296.81 / 0.702);
+}
+
+.theme-contrast .side-menu > .title
+ {
+  background-color: #ab792d;
+}
+
+.theme-contrast .side-menu
+ {
+  backdrop-filter: blur(8px);
+  background-color: #7c5219b5;
 }
 
 @import "markers.scss";

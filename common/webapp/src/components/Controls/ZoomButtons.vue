@@ -1,18 +1,19 @@
 <template>
   <div id="zoom-buttons">
+    <!-- 放大按钮（加号） -->
     <SvgButton @action="zoom(-3)">
       <svg viewBox="0 0 30 30">
-        <path d="M22.471,12.95H17.05V7.527c0-1.297-0.917-2.348-2.05-2.348c-1.132,0-2.05,1.051-2.05,2.348v5.423H7.527
-	c-1.297,0-2.348,0.917-2.348,2.05c0,1.132,1.051,2.05,2.348,2.05h5.423v5.421c0,1.299,0.918,2.351,2.05,2.351
-	c1.133,0,2.05-1.052,2.05-2.351V17.05h5.421c1.299,0,2.351-0.918,2.351-2.05C24.821,13.867,23.77,12.95,22.471,12.95z"/>
+        <!-- 横线（直角） -->
+        <rect x="5" y="13" width="20" height="4" />
+        <!-- 竖线（直角） -->
+        <rect x="13" y="5" width="4" height="20" />
       </svg>
     </SvgButton>
+    <!-- 缩小按钮（减号） -->
     <SvgButton @action="zoom(3)">
       <svg viewBox="0 0 30 30">
-        <g>
-          <path d="M24.821,15c0,1.132-1.052,2.05-2.351,2.05H7.527c-1.297,0-2.348-0.918-2.348-2.05l0,0c0-1.133,1.051-2.05,2.348-2.05
-		h14.944C23.77,12.95,24.821,13.867,24.821,15L24.821,15z"/>
-        </g>
+        <!-- 横线（直角） -->
+        <rect x="5" y="13" width="20" height="4" />
       </svg>
     </SvgButton>
   </div>
@@ -20,6 +21,7 @@
 
 <script>
 import SvgButton from "../ControlBar/SvgButton.vue";
+import { playZoomPlus, playZoomMinus } from '../../js/map/Sounds'; // 导入音效函数
 
 export default {
   name: "ZoomButtons",
@@ -28,6 +30,14 @@ export default {
   },
   methods: {
     zoom(delta) {
+      // 播放对应音效
+      if (delta < 0) {
+        playZoomPlus();   // 放大（负值）
+      } else if (delta > 0) {
+        playZoomMinus();  // 缩小（正值）
+      }
+
+      // 原有缩放逻辑
       let mouseZoom = this.$bluemap.mapViewer.controlsManager.controls?.mouseZoom;
       if (mouseZoom) {
         mouseZoom.deltaZoom += delta;

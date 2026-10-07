@@ -1,18 +1,21 @@
 <template>
-<div class="simple-button" :class="{active: active}" @click="$emit('action')">
+<div class="simple-button" :class="{active: active}" @click="handleClick">
   <div class="label"><slot /></div>
   <div class="submenu-icon" v-if="submenu">
     <svg viewBox="0 0 30 30">
-      <path d="M25.004,9.294c0,0.806-0.75,1.46-1.676,1.46H6.671c-0.925,0-1.674-0.654-1.674-1.46l0,0
-	c0-0.807,0.749-1.461,1.674-1.461h16.657C24.254,7.833,25.004,8.487,25.004,9.294L25.004,9.294z"/>
-      <path d="M25.004,20.706c0,0.807-0.75,1.461-1.676,1.461H6.671c-0.925,0-1.674-0.654-1.674-1.461l0,0
-	c0-0.807,0.749-1.461,1.674-1.461h16.657C24.254,19.245,25.004,19.899,25.004,20.706L25.004,20.706z"/>
+      <rect x="9" y="5" width="4" height="4" />
+      <rect x="13" y="9" width="4" height="4" />
+      <rect x="17" y="13" width="4" height="4" />
+      <rect x="13" y="17" width="4" height="4" />
+      <rect x="9" y="21" width="4" height="4" />
     </svg>
   </div>
 </div>
 </template>
 
 <script>
+import { playClickSound } from '../../js/map/Sounds'; // 根据实际路径调整
+
 export default {
   name: "SimpleButton",
   props: {
@@ -20,6 +23,12 @@ export default {
     active: {
       type: Boolean,
       default: false,
+    }
+  },
+  methods: {
+    handleClick(event) {
+      playClickSound();            // 播放音效
+      this.$emit('action', event); // 触发父组件事件
     }
   }
 }
@@ -76,7 +85,7 @@ export default {
   }
 
   &:active {
-    background-color: var(--theme-fg-light);
+    background-color: #ffffff66;
     color: var(--theme-bg);
 
 

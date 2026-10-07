@@ -1,9 +1,15 @@
 <template>
   <div>
     <Group v-if="showViewControls" :title="$t('controls.title')" >
-      <SimpleButton v-if="mapViewer.map.perspectiveView" :active="appState.controls.state === 'perspective'" @action="$bluemap.setPerspectiveView(500, appState.controls.state === 'free' ? 100 : 0)">{{$t('controls.perspective.button')}}</SimpleButton>
-      <SimpleButton v-if="mapViewer.map.flatView" :active="appState.controls.state === 'flat'" @action="$bluemap.setFlatView(500, appState.controls.state === 'free' ? 100 : 0)">{{$t('controls.flatView.button')}}</SimpleButton>
-      <SimpleButton v-if="mapViewer.map.freeFlightView" :active="appState.controls.state === 'free'" @action="$bluemap.setFreeFlight(500)">{{$t('controls.freeFlight.button')}}</SimpleButton>
+      <SimpleButton v-if="mapViewer.map.perspectiveView" :active="appState.controls.state === 'perspective'" @action="onPerspectiveClick">
+        {{$t('controls.perspective.button')}}
+      </SimpleButton>
+      <SimpleButton v-if="mapViewer.map.flatView" :active="appState.controls.state === 'flat'" @action="onFlatClick">
+        {{$t('controls.flatView.button')}}
+      </SimpleButton>
+      <SimpleButton v-if="mapViewer.map.freeFlightView" :active="appState.controls.state === 'free'" @action="onFreeFlightClick">
+        {{$t('controls.freeFlight.button')}}
+      </SimpleButton>
     </Group>
 
     <Group :title="$t('lighting.title')">
@@ -38,13 +44,6 @@
       <SwitchButton :on="appState.controls.invertMouse" @action="appState.controls.invertMouse = !appState.controls.invertMouse; $bluemap.updateControlsSettings(); $bluemap.saveUserSettings()">{{ $t("freeFlightControls.invertMouseY") }}</SwitchButton>
     </Group>
 
-    <Group :title="$t('theme.title')">
-      <SimpleButton v-for="theme of themes" :key="theme.name"
-                    :active="appState.theme === theme.value"
-                    @action="$bluemap.setTheme(theme.value); $bluemap.saveUserSettings();"
-      >{{theme.name}}</SimpleButton>
-    </Group>
-
     <Group :title="$t('screenshot.title')">
       <SwitchButton :on="appState.screenshot.clipboard" @action="appState.screenshot.clipboard = !appState.screenshot.clipboard; $bluemap.saveUserSettings()">{{ $t("screenshot.clipboard") }}</SwitchButton>
     </Group>
@@ -70,9 +69,10 @@ import SimpleButton from "./SimpleButton.vue";
 import Slider from "./Slider.vue";
 import SwitchButton from "./SwitchButton.vue";
 import {i18n, setLanguage} from "../../i18n";
+import { playFlow, playFlat, playHurt, playInboxFlow, playInboxFlat, playInboxHurt } from '../../js/map/Sounds';
 
 const themes = [
-  {get name(){ return i18n.t("theme.default")}, value: null},
+  {get name(){ return i18n.t("theme.default")}, value: 'dark'},
   {get name(){ return i18n.t("theme.dark")}, value: 'dark'},
   {get name(){ return i18n.t("theme.light")}, value: 'light'},
   {get name(){ return i18n.t("theme.contrast")}, value: 'contrast'},
@@ -85,7 +85,7 @@ const qualityStages = [
 ];
 
 export default {
-name: "SettingsMenu",
+  name: "SettingsMenu",
   components: {SwitchButton, Slider, SimpleButton, Group},
   data() {
     return {
@@ -101,7 +101,6 @@ name: "SettingsMenu",
         ...this.$bluemap.settings
       },
       languages: i18n.languages,
-
       qualityStages: qualityStages,
       themes: themes,
     }
@@ -113,6 +112,39 @@ name: "SettingsMenu",
     }
   },
   methods: {
+    isMobile() {
+      return window.innerWidth < 491;
+    },
+    onPerspectiveClick() {
+      if (this.appState.controls.state !== 'perspective') {
+        if (this.isMobile()) {
+          playInboxFlow();
+        } else {
+          playFlow();
+        }
+        this.$bluemap.setPerspectiveView(500, this.appState.controls.state === 'free' ? 100 : 0);
+      }
+    },
+    onFlatClick() {
+      if (this.appState.controls.state !== 'flat') {
+        if (this.isMobile()) {
+          playInboxFlat();
+        } else {
+          playFlat();
+        }
+        this.$bluemap.setFlatView(500, this.appState.controls.state === 'free' ? 100 : 0);
+      }
+    },
+    onFreeFlightClick() {
+      if (this.appState.controls.state !== 'free') {
+        if (this.isMobile()) {
+          playInboxHurt();
+        } else {
+          playHurt();
+        }
+        this.$bluemap.setFreeFlight(500);
+      }
+    },
     switchChunkBorders() {
       this.$bluemap.setChunkBorders(!this.mapViewer.uniforms.chunkBorders.value);
     },
@@ -124,9 +156,9 @@ name: "SettingsMenu",
       return f === 0 ? this.$t("renderDistance.off") : f.toFixed(0);
     },
     async changeLanguage(lang) {
-        await setLanguage(lang);
-        this.$bluemap.updatePageAddress()
-        this.$bluemap.saveUserSettings();
+      await setLanguage(lang);
+      this.$bluemap.updatePageAddress();
+      this.$bluemap.saveUserSettings();
     }
   }
 }

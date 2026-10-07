@@ -25,9 +25,7 @@
 
     <SettingsMenu v-if="menu.currentPage().id === 'settings'" />
 
-    <div class="info-content" v-if="menu.currentPage().id === 'info'" v-html="$t('info.content', {
-      version: $bluemap.settings.version
-    })"></div>
+    <InfoPage v-if="menu.currentPage().id === 'info'" />
 
   </SideMenu>
 </template>
@@ -39,10 +37,11 @@ import SettingsMenu from "./SettingsMenu.vue";
 import {MainMenu} from "../../js/MainMenu";
 import MarkerSetMenu from "./MarkerSetMenu.vue";
 import MapButton from "./MapButton.vue";
+import InfoPage from "./InfoPage.vue";
 
 export default {
   name: "MainMenu",
-  components: {MapButton, MarkerSetMenu, SettingsMenu, SimpleButton, SideMenu},
+  components: {MapButton, MarkerSetMenu, SettingsMenu, SimpleButton, SideMenu, InfoPage},
   props: {
     menu: MainMenu
   },

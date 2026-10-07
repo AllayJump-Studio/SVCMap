@@ -1,16 +1,26 @@
 <template>
-  <div class="svg-button" :class="{active: active}" @click="$emit('action', $event)">
+  <div class="svg-button" :class="{active: active}" @click="handleClick">
     <slot />
   </div>
 </template>
 
 <script>
-  export default {
-    name: "SvgButton",
-    props: {
-      active: Boolean,
+import { playClickSound } from '@/js/map/Sounds'
+
+export default {
+  name: "SvgButton",
+  props: {
+    active: Boolean,
+  },
+  methods: {
+    handleClick(event) {
+      // 播放点击音效
+      playClickSound();
+      // 向上传递点击事件
+      this.$emit('action', event);
     }
   }
+}
 </script>
 
 <style lang="scss">
@@ -35,7 +45,7 @@
   }
 
   &:active {
-    background-color: var(--theme-fg-light);
+    background-color: #d9d9d9c4;
     color: var(--theme-bg);
   }
 

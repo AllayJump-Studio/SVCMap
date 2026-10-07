@@ -11,9 +11,11 @@ pluginManagement {
         mavenCentral()
         maven ("https://maven.minecraftforge.net" )
         maven ("https://maven.fabricmc.net/" )
-        maven ("https://maven.neoforged.net/releases" )
+        maven ("https://registry.npmmirror.com/-/binary/node" )
+        maven ("https://maven.aliyun.com/repository/public" )
     }
 }
+
 
 rootProject.name = "bluemap"
 
@@ -23,12 +25,8 @@ include(":core")
 include(":common")
 
 implementation("cli")
-implementation("fabric")
-implementation("forge")
-implementation("neoforge")
 implementation("paper")
 implementation("spigot")
-implementation("sponge")
 
 fun implementation(name: String) {
     val project = ":$name"

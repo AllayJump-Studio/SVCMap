@@ -1,13 +1,10 @@
 <template>
-  <SvgButton class="menu-button" :class="{close: close, back: back}">
+  <SvgButton class="menu-button" :class="{close: close, back: back}" @action="handleAction">
     <svg viewBox="0 0 30 30">
       <g>
-        <path d="M25.004,9.294c0,0.806-0.75,1.46-1.676,1.46H6.671c-0.925,0-1.674-0.654-1.674-1.46l0,0
-    c0-0.807,0.749-1.461,1.674-1.461h16.657C24.254,7.833,25.004,8.487,25.004,9.294L25.004,9.294z"/>
-        <path d="M25.004,15c0,0.807-0.75,1.461-1.676,1.461H6.671c-0.925,0-1.674-0.654-1.674-1.461l0,0
-    c0-0.807,0.749-1.461,1.674-1.461h16.657C24.254,13.539,25.004,14.193,25.004,15L25.004,15z"/>
-        <path d="M25.004,20.706c0,0.807-0.75,1.461-1.676,1.461H6.671c-0.925,0-1.674-0.654-1.674-1.461l0,0
-    c0-0.807,0.749-1.461,1.674-1.461h16.657C24.254,19.245,25.004,19.899,25.004,20.706L25.004,20.706z"/>
+      <path d="M6.671,7.833 L25.004,7.833 L25.004,10.754 L6.671,10.754 Z"/>
+      <path d="M6.671,13.539 L25.004,13.539 L25.004,16.461 L6.671,16.461 Z"/>
+      <path d="M6.671,19.245 L25.004,19.245 L25.004,22.167 L6.671,22.167 Z"/>
       </g>
     </svg>
   </SvgButton>
@@ -15,19 +12,31 @@
 
 <script>
 import SvgButton from "./SvgButton.vue";
+import { playBoxOpen, playBoxClose } from '@/js/map/BoxSounds';
+
 export default {
   name: "MenuButton",
   components: {SvgButton},
   props: {
     close: Boolean,
     back: Boolean,
+  },
+  methods: {
+    handleAction(event) {
+      if (this.close) {
+        playBoxClose();   
+      } else {
+        playBoxOpen();  
+      }
+      // 传递点击事件
+      this.$emit('action', event);
+    }
   }
 }
 </script>
 
 <style lang="scss">
   .menu-button {
-
     svg {
       g {
         transform-origin: center;

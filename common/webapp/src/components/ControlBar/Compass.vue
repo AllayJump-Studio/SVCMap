@@ -12,6 +12,7 @@
 <script>
   import {animate, EasingFunctions} from "../../js/util/Utils";
   import SvgButton from "./SvgButton.vue";
+  import { playCompass } from '../../js/map/Sounds'; // 导入指南针音效
 
   let animation;
 
@@ -32,6 +33,9 @@
       action(evt) {
         evt.preventDefault();
 
+        // 播放指南针音效
+        playCompass();
+
         if (animation) animation.cancel();
 
         let startRotation = this.controls.rotation;
@@ -49,22 +53,22 @@
       height: 1.8em;
 
       .north {
-        fill: var(--theme-fg);
+        fill: #ffff9f;
       }
 
       .south {
-        fill: var(--theme-fg-light);
+        fill: #96ffff;
       }
     }
 
     &:active {
       svg {
         .north {
-          fill: var(--theme-bg);
+          fill: #ffff9f;
         }
 
         .south {
-          fill: var(--theme-bg-light);
+          fill: #96ffff;
         }
       }
     }
