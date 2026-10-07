@@ -32,4 +32,15 @@ public interface ServerEventListener {
 
     default void onPlayerLeave(UUID playerUuid) {};
 
+    /**
+     * Called when a player sends a chat message.
+     * <p><i>On most implementations this is called from an async thread, so it must not block
+     * and must not access thread-unsafe server state.</i></p>
+     *
+     * @param playerUuid the uuid of the player that sent the message
+     * @param playerName the name of the player that sent the message
+     * @param message the message as plain text (without any formatting)
+     */
+    default void onPlayerChat(UUID playerUuid, String playerName, String message) {};
+
 }

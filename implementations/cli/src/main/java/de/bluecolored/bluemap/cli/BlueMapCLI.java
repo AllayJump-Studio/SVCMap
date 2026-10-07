@@ -292,7 +292,7 @@ public class BlueMapCLI {
             BmMap map = blueMap.getMaps().get(mapConfigEntry.getKey());
 
             MapRequestHandler mapRequestHandler = map != null ?
-                    new MapRequestHandler(map, null, new LiveMarkersDataSupplier(map.getMarkerSets()), config.isSseEnabled()) :
+                    new MapRequestHandler(map, null, new LiveMarkersDataSupplier(map.getMarkerSets()), null, config.isSseEnabled()) :
                     new MapRequestHandler(storage);
 
             routingRequestHandler.register(

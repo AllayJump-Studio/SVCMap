@@ -24,6 +24,8 @@
  */
 package de.bluecolored.bluemap.common.web;
 
+import de.bluecolored.bluemap.common.chat.ChatMessage;
+import de.bluecolored.bluemap.common.chat.ChatMessageHistory;
 import de.bluecolored.bluemap.common.web.http.HttpResponse;
 import de.bluecolored.bluemap.common.web.http.HttpStatusCode;
 import de.bluecolored.bluemap.core.map.BmMap;
@@ -47,9 +49,10 @@ public class MapRequestHandler extends RoutingRequestHandler implements Closeabl
             BmMap map,
             @Nullable Supplier<String> livePlayersDataSupplier,
             @Nullable Supplier<String> liveMarkerDataSupplier,
+            @Nullable ChatMessageHistory chatHistory,
             boolean useSSE
     ) {
-        this(map.getStorage(), livePlayersDataSupplier, liveMarkerDataSupplier, useSSE);
+        this(map.getStorage(), livePlayersDataSupplier, liveMarkerDataSupplier, chatHistory, useSSE);
 
         if (useSSE) {
             map.getHiresModelManager().addTileUpdateListener(tile -> onTileUpdate(tile, 0));
@@ -58,13 +61,14 @@ public class MapRequestHandler extends RoutingRequestHandler implements Closeabl
     }
 
     public MapRequestHandler(MapStorage mapStorage) {
-        this(mapStorage, null, null, false);
+        this(mapStorage, null, null, null, false);
     }
 
     public MapRequestHandler(
             MapStorage mapStorage,
             @Nullable Supplier<String> livePlayersDataSupplier,
             @Nullable Supplier<String> liveMarkerDataSupplier,
+            @Nullable ChatMessageHistory chatHistory,
             boolean useSSE
     ) {
         register(".*", new MapStorageRequestHandler(mapStorage));
@@ -98,6 +102,12 @@ public class MapRequestHandler extends RoutingRequestHandler implements Closeabl
             if (useSSE) registerSseCallback(this.playerDataBroadcaster, this::onPlayerUpdate);
             register("live/players\\.json", "", new JsonDataRequestHandler(this.playerDataBroadcaster));
         }
+
+        // chat history, so a (re)connecting client can load the recent chat
+        // chat is server-wide, so every map serves the same history
+        if (chatHistory != null) {
+            register("live/chat\\.json", "", new JsonDataRequestHandler(chatHistory));
+        }
     }
 
     /**
@@ -125,6 +135,14 @@ public class MapRequestHandler extends RoutingRequestHandler implements Closeabl
 
     private void onMarkerUpdate(String data) {
         sseConnections.broadcast("marker", data);
+    }
+
+    /**
+     * Broadcasts a chat message to all clients that are currently connected to this map via SSE.
+     * <p>Does nothing if no client is connected.
+     */
+    public void broadcastChat(ChatMessage message) {
+        sseConnections.broadcast("chat", message.toJson());
     }
 
     @Override

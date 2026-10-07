@@ -53,4 +53,24 @@ public class PluginConfig {
 
     private int playerRenderLimit = -1;
 
+    private ChatConfig chat = new ChatConfig();
+
+    @ConfigSerializable
+    @Getter
+    public static class ChatConfig {
+
+        private boolean enabled = true;
+
+        /**
+         * Messages longer than this are truncated before they are sent to the webapp.
+         */
+        private int messageLengthLimit = 256;
+
+        /**
+         * How many messages are kept in memory, so a (re)connecting webapp can load the recent chat.
+         */
+        private int historyLength = 100;
+
+    }
+
 }

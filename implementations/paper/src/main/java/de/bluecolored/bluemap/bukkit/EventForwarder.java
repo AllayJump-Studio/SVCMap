@@ -25,6 +25,8 @@
 package de.bluecolored.bluemap.bukkit;
 
 import de.bluecolored.bluemap.common.serverinterface.ServerEventListener;
+import io.papermc.paper.event.player.AsyncChatEvent;
+import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
@@ -33,6 +35,7 @@ import org.bukkit.event.player.PlayerQuitEvent;
 
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.UUID;
 
 public class EventForwarder implements Listener {
 
@@ -50,6 +53,10 @@ public class EventForwarder implements Listener {
         listeners.clear();
     }
 
+    private synchronized ServerEventListener[] getListeners() {
+        return listeners.toArray(new ServerEventListener[0]);
+    }
+
     @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
     public synchronized void onPlayerJoin(PlayerJoinEvent evt) {
         for (ServerEventListener listener : listeners) listener.onPlayerJoin(evt.getPlayer().getUniqueId());
@@ -58,6 +65,14 @@ public class EventForwarder implements Listener {
     @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
     public synchronized void onPlayerLeave(PlayerQuitEvent evt) {
         for (ServerEventListener listener : listeners) listener.onPlayerLeave(evt.getPlayer().getUniqueId());
+    }
+
+    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
+    public void onPlayerChat(AsyncChatEvent evt) {
+        UUID playerUuid = evt.getPlayer().getUniqueId();
+        String playerName = evt.getPlayer().getName();
+        String message = PlainTextComponentSerializer.plainText().serialize(evt.message());
+        for (ServerEventListener listener : getListeners()) listener.onPlayerChat(playerUuid, playerName, message);
     }
 
 }

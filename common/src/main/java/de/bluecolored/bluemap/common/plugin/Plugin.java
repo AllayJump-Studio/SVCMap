@@ -31,7 +31,10 @@ import de.bluecolored.bluemap.common.InterruptableReentrantLock;
 import de.bluecolored.bluemap.common.MissingResourcesException;
 import de.bluecolored.bluemap.common.addons.AddonLoader;
 import de.bluecolored.bluemap.common.api.BlueMapAPIImpl;
+import de.bluecolored.bluemap.common.chat.ChatMessage;
+import de.bluecolored.bluemap.common.chat.ChatMessageHistory;
 import de.bluecolored.bluemap.common.config.*;
+import de.bluecolored.bluemap.common.debug.DebugDump;
 import de.bluecolored.bluemap.common.debug.StateDumper;
 import de.bluecolored.bluemap.common.live.LiveMarkersDataSupplier;
 import de.bluecolored.bluemap.common.live.LivePlayersDataSupplier;
@@ -82,6 +85,7 @@ import java.time.Instant;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
 import java.util.*;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.TimeUnit;
 import java.util.regex.Pattern;
 
@@ -107,6 +111,23 @@ public class Plugin implements ServerEventListener {
     private HttpServer webServer;
     private RoutingRequestHandler webRequestHandler;
     private Logger webLogger;
+
+    /**
+     * All map-request-handlers that currently serve SSE connections.
+     * Chat is server-wide, so a chat message is broadcast to all of them (and thus to the
+     * client that is currently viewing any map).
+     */
+    @DebugDump(exclude = true)
+    private final List<MapRequestHandler> mapRequestHandlers = new CopyOnWriteArrayList<>();
+
+    @DebugDump(exclude = true)
+    private volatile @Nullable ChatMessageHistory chatHistory = null;
+
+    @DebugDump(exclude = true)
+    private volatile boolean chatEnabled = false;
+
+    @DebugDump(exclude = true)
+    private volatile int chatMessageLengthLimit = 256;
 
     private Timer timer;
     private Map<String, MapUpdateService> mapUpdateServices;
@@ -153,6 +174,12 @@ public class Plugin implements ServerEventListener {
                 WebserverConfig webserverConfig = configManager.getWebserverConfig();
                 WebappConfig webappConfig = configManager.getWebappConfig();
                 PluginConfig pluginConfig = configManager.getPluginConfig();
+
+                //apply chat config
+                PluginConfig.ChatConfig chatConfig = pluginConfig.getChat();
+                this.chatEnabled = chatConfig.isEnabled();
+                this.chatMessageLengthLimit = chatConfig.getMessageLengthLimit();
+                this.chatHistory = this.chatEnabled ? new ChatMessageHistory(chatConfig.getHistoryLength()) : null;
 
                 //apply new file-logger config
                 if (coreConfig.getLog().getFile() != null) {
@@ -233,11 +260,20 @@ public class Plugin implements ServerEventListener {
                                     null;
                             LiveMarkersDataSupplier liveMarkersDataSupplier = new LiveMarkersDataSupplier(map.getMarkerSets());
 
-                            mapRequestHandler = new MapRequestHandler(map, livePlayersDataSupplier, liveMarkersDataSupplier, webserverConfig.isSseEnabled());
+                            mapRequestHandler = new MapRequestHandler(
+                                    map,
+                                    livePlayersDataSupplier,
+                                    liveMarkersDataSupplier,
+                                    this.chatHistory,
+                                    webserverConfig.isSseEnabled()
+                            );
                         } else {
                             Storage storage = blueMap.getOrLoadStorage(mapConfig.getStorage());
-                            mapRequestHandler = new MapRequestHandler(storage.map(id));
+                            mapRequestHandler = new MapRequestHandler(storage.map(id), null, null, this.chatHistory, false);
                         }
+
+                        // chat is broadcast to all maps, so we need to keep track of the handlers
+                        if (this.chatHistory != null) this.mapRequestHandlers.add(mapRequestHandler);
 
                         webRequestHandler.register(
                                 "maps/" + Pattern.quote(id) + "/(.*)",
@@ -532,6 +568,11 @@ public class Plugin implements ServerEventListener {
                 //clear resources
                 pluginState = null;
 
+                //stop forwarding chat
+                chatEnabled = false;
+                chatHistory = null;
+                mapRequestHandlers.clear();
+
                 //done
                 loaded = false;
             }
@@ -699,6 +740,29 @@ public class Plugin implements ServerEventListener {
     @Override
     public void onPlayerLeave(UUID playerUuid) {
         checkPausedByPlayerCountSoon();
+    }
+
+    @Override
+    public void onPlayerChat(UUID playerUuid, String playerName, String message) {
+        if (!chatEnabled) return;
+        if (message == null || message.isEmpty()) return;
+
+        ChatMessage chatMessage = ChatMessage.player(playerUuid, playerName, truncateChatMessage(message));
+
+        // keep the recent chat, so a (re)connecting client can load it via live/chat.json
+        ChatMessageHistory history = this.chatHistory;
+        if (history != null) history.add(chatMessage);
+
+        // broadcast to every map, so it reaches the client that is currently viewing any of them
+        for (MapRequestHandler mapRequestHandler : mapRequestHandlers) {
+            mapRequestHandler.broadcastChat(chatMessage);
+        }
+    }
+
+    private String truncateChatMessage(String message) {
+        int limit = chatMessageLengthLimit;
+        if (limit <= 0 || message.length() <= limit) return message;
+        return message.substring(0, limit);
     }
 
     private void checkPausedByPlayerCountSoon() {
