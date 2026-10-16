@@ -195,8 +195,13 @@ input {
 }
 
 /* ====== 默认深色 ====== */
+/* 注意：#zoom-buttons .svg-button 才是缩放按钮的真实选择器
+   （原 .zoom-button 在项目里不存在，规则从未生效过）
+   聊天栏的悬浮按钮同样基于 .svg-button，而 .svg-button 的底色是
+   var(--theme-bg)（现在是 #ffffff00，全透明），所以也要一并套上这套毛玻璃。 */
 .control-bar,
-.zoom-button
+#zoom-buttons .svg-button,
+#chat .chat-button
  {
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
@@ -217,7 +222,8 @@ input {
 
 /* ====== 浅色 ====== */
 .theme-light .control-bar,
-.theme-light .zoom-button
+.theme-light #zoom-buttons .svg-button,
+.theme-light #chat .chat-button
  {
   background-color: lch(46.84% 0.01 296.81 / 0.702);
 }
@@ -235,7 +241,8 @@ input {
 
 /* 高对比度 */
 .theme-contrast .control-bar,
-.theme-contrast .zoom-button
+.theme-contrast #zoom-buttons .svg-button,
+.theme-contrast #chat .chat-button
  {
   background-color: lch(46.84% 0.01 296.81 / 0.702);
 }
@@ -251,4 +258,47 @@ input {
   background-color: #7c5219b5;
 }
 
+/* ====== 缩放按钮的状态配色 ======
+   上面 #zoom-buttons .svg-button（特异性 1,1,0）高于 SvgButton 组件内的
+   .svg-button:hover / .active / :active（0,2,0），会把这些状态盖掉，
+   所以在三个主题块之后按同样的最终特异性把它们显式恢复。
+   颜色值与 SvgButton.vue 中保持一致。 */
+#zoom-buttons .svg-button:hover {
+  background-color: var(--theme-bg-hover);
+}
+
+#zoom-buttons .svg-button.active {
+  background-color: var(--theme-bg-light);
+}
+
+#zoom-buttons .svg-button:active {
+  background-color: #d9d9d9c4;
+}
+
+/* 聊天栏悬浮按钮同理：上面 #chat .chat-button（特异性 1,1,0）同样会盖掉
+   SvgButton 组件内的状态规则，一并恢复。 */
+#chat .chat-button:hover {
+  background-color: var(--theme-bg-hover);
+}
+
+#chat .chat-button.active {
+  background-color: var(--theme-bg-light);
+}
+
+#chat .chat-button:active {
+  background-color: #d9d9d9c4;
+}
+
 @import "markers.scss";
+
+/* ====== 方块坐标弹窗 / 标签弹窗 ======
+   它们同样使用 var(--theme-bg)，而 --theme-bg 现在带 0 alpha（完全透明），
+   所以也失去了背景。这里补上与控制栏一致的毛玻璃背景。
+   必须放在 @import "markers.scss" 之后：选择器特异性相同（1,1,0），
+   只能靠源码顺序取胜。 */
+#map-container .bm-marker-popup,
+#map-container .bm-marker-labelpopup {
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  background-color: lch(46.84% 0.01 296.81 / 0.702);
+}

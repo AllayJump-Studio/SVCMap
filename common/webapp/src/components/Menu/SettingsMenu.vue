@@ -38,6 +38,11 @@
       <SwitchButton :on="appState.controls.showZoomButtons" @action="appState.controls.showZoomButtons = !appState.controls.showZoomButtons; $bluemap.saveUserSettings()">{{ $t("mapControls.showZoomButtons") }}</SwitchButton>
     </Group>
 
+    <Group :title="$t('chat.title')">
+      <SwitchButton :on="!appState.controls.hideChat" @action="appState.controls.hideChat = !appState.controls.hideChat; $bluemap.saveUserSettings()">{{ $t("chat.showChat") }}</SwitchButton>
+      <SwitchButton :on="appState.controls.chatCloseAfterSend" @action="appState.controls.chatCloseAfterSend = !appState.controls.chatCloseAfterSend; $bluemap.saveUserSettings()">{{ $t("chat.closeAfterSend") }}</SwitchButton>
+    </Group>
+
     <Group :title="$t('freeFlightControls.title')">
       <Slider :value="appState.controls.mouseSensitivity" :min="0.1" :max="5" :step="0.05"
               @update="appState.controls.mouseSensitivity = $event; $bluemap.updateControlsSettings();" @lazy="$bluemap.saveUserSettings()">{{ $t("freeFlightControls.mouseSensitivity") }}</Slider>

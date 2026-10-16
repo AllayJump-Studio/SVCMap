@@ -39,6 +39,13 @@ import {PlayerMarkerManager} from "./markers/PlayerMarkerManager";
 import {NormalMarkerManager} from "./markers/NormalMarkerManager";
 import {reactive} from "vue";
 
+/**
+ * 聊天：最多在内存中保留多少条消息（与服务端 plugin.conf 的 chat.history-length 对应）。
+ * 「仅旁观」状态的 15 秒窗口与渐隐时长定义在 components/Chat/ChatBox.vue 里。
+ * @type {number}
+ */
+const CHAT_MAX_MESSAGES = 100;
+
 export class BlueMapApp {
 
     /**
@@ -100,7 +107,20 @@ export class BlueMapApp {
                 mouseSensitivity: 1,
                 showZoomButtons: true,
                 invertMouse: false,
-                pauseTileLoading: false
+                pauseTileLoading: false,
+                // 聊天相关设置（会随其它设置一起持久化）
+                hideChat: false,
+                chatCloseAfterSend: true
+            },
+            chat: {
+                // 'spectator' | 'open'（'hidden' 由 controls.hideChat 表达，不是这里的第三个值）
+                state: "spectator",
+                // 收到的聊天消息，按时间正序；元素形如 {type, source, playerUuid, playerName, message, timestamp}
+                messages: [],
+                // 服务端时间 - 浏览器时间（毫秒）。消息时间戳来自服务端，而 15 秒窗口
+                // 要用浏览器时钟来推进，两者不同步时会导致消息「一闪就没」或「永不消失」，
+                // 所以用最新收到的实时消息持续估算这个偏差。
+                clockOffset: 0
             },
             menu: this.mainMenu,
             maps: [],
@@ -275,6 +295,7 @@ export class BlueMapApp {
             this.initPlayerMarkerManager(),
             this.initMarkerFileManager(),
             this.initEventSource(),
+            this.loadChatHistory(map),
         ]);
     }
 
@@ -409,6 +430,142 @@ export class BlueMapApp {
         });
     }
 
+    // ---------------------------------------------------------------- chat
+
+    /**
+     * 拉取聊天历史快照。
+     * 服务端未启用聊天（或未升级到带聊天的版本）时该请求会失败，属正常情况。
+     * @param map {BlueMapMap}
+     * @returns {Promise<Object>}
+     */
+    loadChatData(map) {
+        const url = map.data.liveDataRoot + "/live/chat.json";
+        return new Promise((resolve, reject) => {
+            let loader = new RevalidatingFileLoader();
+            loader.setRevalidatedUrls(new Set()); // force no-cache requests
+            loader.setResponseType("json");
+            loader.load(url,
+                fileData => {
+                    if (!fileData) reject(`Failed to parse '${url}'!`);
+                    else resolve(fileData);
+                },
+                () => {},
+                () => reject(`Failed to load '${url}'!`)
+            )
+        });
+    }
+
+    /**
+     * 加载聊天历史并合并进 appState.chat.messages。
+     * @param map {BlueMapMap}
+     * @returns {Promise<void>}
+     */
+    async loadChatHistory(map) {
+        try {
+            const data = await this.loadChatData(map);
+            if (data && Array.isArray(data.messages)) {
+                for (const message of data.messages) this.addChatMessage(message);
+            }
+        } catch (e) {
+            // 未启用聊天功能时没有这个端点，静默跳过
+            alert(this.events, `Chat history not available (${e})`, "debug");
+        }
+    }
+
+    /**
+     * 追加一条聊天消息。
+     * 按 (timestamp, playerUuid, message) 去重，因为历史快照与 SSE 推送可能重叠。
+     * @param message {Object}
+     * @param live {boolean} 是否来自 SSE 实时推送。
+     *        实时消息的时间戳必然接近当前时刻，因此用它来校正服务端/浏览器时钟偏差；
+     *        历史快照的消息时间戳是过去的，不能用来校正。
+     */
+    addChatMessage(message, live = false) {
+        if (!message || typeof message.message !== "string") return;
+
+        if (live && typeof message.timestamp === "number") {
+            this.appState.chat.clockOffset = message.timestamp - Date.now();
+        }
+
+        const messages = this.appState.chat.messages;
+        const duplicate = messages.some(m =>
+            m.timestamp === message.timestamp &&
+            m.playerUuid === message.playerUuid &&
+            m.message === message.message
+        );
+        if (duplicate) return;
+
+        messages.push(message);
+        if (messages.length > CHAT_MAX_MESSAGES) messages.splice(0, messages.length - CHAT_MAX_MESSAGES);
+    }
+
+    /**
+     * 服务端时间轴上的「现在」（毫秒）。用于和消息的 timestamp 比较。
+     * @returns {number}
+     */
+    getChatServerNow() {
+        return Date.now() + this.appState.chat.clockOffset;
+    }
+
+    /**
+     * 进入「聊天」状态：显示输入框、展示全部历史消息。
+     */
+    openChat() {
+        if (this.appState.controls.hideChat) return;
+        this.appState.chat.state = "open";
+    }
+
+    /**
+     * 回到「仅旁观聊天」状态：隐藏输入框，只显示最近 15 秒的消息。
+     */
+    closeChat() {
+        this.appState.chat.state = "spectator";
+    }
+
+    /**
+     * 在「聊天」与「仅旁观」之间切换（悬浮按钮 / T 键）。
+     */
+    toggleChat() {
+        if (this.appState.chat.state === "open") this.closeChat();
+        else this.openChat();
+    }
+
+    /**
+     * 发送一条聊天消息（Web -> 游戏方向）。
+     * 服务端接收端点属于下一步（上行链路）的工作，当前发送会失败并给出一条本地提示。
+     * @param text {string}
+     * @returns {Promise<boolean>} 是否发送成功
+     */
+    async sendChat(text) {
+        const message = (text || "").trim();
+        if (!message) return false;
+
+        const map = this.mapViewer.map;
+        if (!map) return false;
+
+        try {
+            const response = await fetch(map.data.liveDataRoot + "/live/chat", {
+                method: "POST",
+                headers: {"Content-Type": "application/json; charset=utf-8"},
+                body: JSON.stringify({message})
+            });
+            if (!response.ok) throw new Error(`HTTP ${response.status}`);
+            return true;
+        } catch (e) {
+            alert(this.events, `Failed to send chat message: ${e}`, "debug");
+            this.addChatMessage({
+                type: "chat",
+                source: "system",
+                playerUuid: null,
+                playerName: "",
+                message: i18n.t("chat.sendUnavailable"),
+                // 本地生成的消息也放在服务端时间轴上，避免与其它消息的过期判断打架
+                timestamp: this.getChatServerNow()
+            });
+            return false;
+        }
+    }
+
     initEventSource(){
         if (this.mapEventSource) {
             this.mapEventSource.close();
@@ -448,6 +605,14 @@ export class BlueMapApp {
 
         this.mapEventSource.addEventListener("marker", ({ data }) => {
             this.markerFileManager.updateFromData(JSON.parse(data));
+        });
+
+        this.mapEventSource.addEventListener("chat", ({ data }) => {
+            try {
+                this.addChatMessage(JSON.parse(data), true);
+            } catch (e) {
+                alert(this.events, `Failed to parse chat event: ${e}`, "warning");
+            }
         });
     }
 
@@ -708,6 +873,8 @@ export class BlueMapApp {
         this.appState.controls.invertMouse = this.loadUserSetting("invertMouse", this.appState.controls.invertMouse);
         this.appState.controls.pauseTileLoading = this.loadUserSetting("pauseTileLoading", this.appState.controls.pauseTileLoading);
         this.appState.controls.showZoomButtons = this.loadUserSetting("showZoomButtons", this.appState.controls.showZoomButtons);
+        this.appState.controls.hideChat = this.loadUserSetting("hideChat", this.appState.controls.hideChat);
+        this.appState.controls.chatCloseAfterSend = this.loadUserSetting("chatCloseAfterSend", this.appState.controls.chatCloseAfterSend);
         this.updateControlsSettings();
         this.setTheme(this.loadUserSetting("theme", this.appState.theme));
         this.setScreenshotClipboard(this.loadUserSetting("screenshotClipboard", this.appState.screenshot.clipboard));
@@ -730,6 +897,8 @@ export class BlueMapApp {
         this.saveUserSetting("invertMouse", this.appState.controls.invertMouse);
         this.saveUserSetting("pauseTileLoading", this.appState.controls.pauseTileLoading);
         this.saveUserSetting("showZoomButtons", this.appState.controls.showZoomButtons);
+        this.saveUserSetting("hideChat", this.appState.controls.hideChat);
+        this.saveUserSetting("chatCloseAfterSend", this.appState.controls.chatCloseAfterSend);
         this.saveUserSetting("theme", this.appState.theme);
         this.saveUserSetting("screenshotClipboard", this.appState.screenshot.clipboard);
         this.saveUserSetting("lang", i18n.locale.value);

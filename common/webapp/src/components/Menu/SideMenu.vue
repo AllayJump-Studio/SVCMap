@@ -86,7 +86,8 @@ export default {
   transform: translateX(0);
 
   // 进入起始状态
-  &-enter {
+  // 注意：Vue 3 的类名是 -enter-from（Vue 2 的 -enter 在 Vue 3 中不会被添加）
+  &-enter-from {
     transform: translateX(-100%);
     pointer-events: none;
     * {
@@ -107,7 +108,8 @@ export default {
   }
 
   // 离开起始状态（显示）
-  &-leave {
+  // 注意：Vue 3 的类名是 -leave-from（Vue 2 的 -leave 在 Vue 3 中不会被添加）
+  &-leave-from {
     transform: translateX(0);
   }
 

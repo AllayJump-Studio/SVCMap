@@ -56,9 +56,18 @@ export default {
     display: flex;
     flex-direction: column;
 
-    filter: drop-shadow(1px 1px 3px rgba(0, 0, 0, 0.53));
     width: 2em;
 
     margin: 0.5em;
+  }
+
+  /* 阴影从容器移到每个按钮上。
+     原因：带 filter 的容器会成为 backdrop root，其子元素的 backdrop-filter
+     只能采样容器内部的内容，地图就不会被模糊。
+     这里用 box-shadow 而不是 filter: drop-shadow()，因为 box-shadow 不会
+     创建 backdrop root，按钮的毛玻璃才能正常采样到地图（按钮是直角不透明
+     方块，两者外观一致）。 */
+  #zoom-buttons .svg-button {
+    box-shadow: 1px 1px 3px rgba(0, 0, 0, 0.53);
   }
 </style>

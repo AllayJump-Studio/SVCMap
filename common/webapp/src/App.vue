@@ -2,6 +2,8 @@
   <div id="app" :class="{'theme-light': appState.theme === 'light', 'theme-dark': appState.theme === 'dark', 'theme-contrast': appState.theme === 'contrast'}">
     <FreeFlightMobileControls v-if="mapViewer.mapState === 'loaded' && appState.controls.state === 'free'" />
     <ZoomButtons v-if="showMapMenu && appState.controls.showZoomButtons && appState.controls.state !== 'free'" />
+    <!-- 自由飞行时不再隐藏，而是由 ChatBox 自己平滑移动到左上角操作栏下方 -->
+    <ChatBox v-if="showMapMenu && !appState.controls.hideChat" />
     <ControlBar />
     <div v-if="mapViewer.mapState !== 'loaded'" class="map-state-message">{{ $t("map." + mapViewer.mapState) }}</div>
     <MainMenu :menu="appState.menu" />
@@ -13,6 +15,7 @@ import ControlBar from "./components/ControlBar/ControlBar.vue";
 import MainMenu from "./components/Menu/MainMenu.vue";
 import FreeFlightMobileControls from "./components/Controls/FreeFlightMobileControls.vue";
 import ZoomButtons from "./components/Controls/ZoomButtons.vue";
+import ChatBox from "./components/Chat/ChatBox.vue";
 
 export default {
   name: 'App',
@@ -20,7 +23,8 @@ export default {
     FreeFlightMobileControls,
     MainMenu,
     ControlBar,
-    ZoomButtons
+    ZoomButtons,
+    ChatBox
   },
   computed: {
     showMapMenu() {
