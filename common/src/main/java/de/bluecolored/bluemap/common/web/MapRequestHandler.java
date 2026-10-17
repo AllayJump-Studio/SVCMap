@@ -26,6 +26,8 @@ package de.bluecolored.bluemap.common.web;
 
 import de.bluecolored.bluemap.common.chat.ChatMessage;
 import de.bluecolored.bluemap.common.chat.ChatMessageHistory;
+import de.bluecolored.bluemap.common.web.auth.WebSession;
+import de.bluecolored.bluemap.common.web.http.HttpRequest;
 import de.bluecolored.bluemap.common.web.http.HttpResponse;
 import de.bluecolored.bluemap.common.web.http.HttpStatusCode;
 import de.bluecolored.bluemap.core.map.BmMap;
@@ -35,12 +37,19 @@ import org.jetbrains.annotations.Nullable;
 import com.flowpowered.math.vector.Vector2i;
 
 import java.io.Closeable;
+import java.util.function.BooleanSupplier;
 import java.util.function.Consumer;
+import java.util.function.Function;
 import java.util.function.Supplier;
 
 public class MapRequestHandler extends RoutingRequestHandler implements Closeable {
 
     private final SseConnectionManager sseConnections = new SseConnectionManager();
+
+    /**
+     * Resolves the web session of a request, used to suppress map data for idle sessions.
+     */
+    private volatile @Nullable Function<HttpRequest, WebSession> sessionResolver;
 
     private @Nullable LiveDataSupplierBroadcaster<String> markerDataBroadcaster;
     private @Nullable LiveDataSupplierBroadcaster<String> playerDataBroadcaster;
@@ -74,7 +83,7 @@ public class MapRequestHandler extends RoutingRequestHandler implements Closeabl
         register(".*", new MapStorageRequestHandler(mapStorage));
 
         if (useSSE) {
-            register("live/sse", "", _ -> {
+            register("live/sse", "", request -> {
                 HttpResponse response = new HttpResponse(HttpStatusCode.OK);
                 response.setHeader("Content-Type", "text/event-stream");
                 response.setHeader("Cache-Control", "no-store");
@@ -85,8 +94,16 @@ public class MapRequestHandler extends RoutingRequestHandler implements Closeabl
                 // attempt to turn off buffering in upstream proxy
                 response.setHeader("X-Accel-Buffering", "no");
 
+                // idle sessions must not receive any more map data (no traffic for abandoned tabs);
+                // the connection stays open and resumes as soon as the client reports activity again
+                BooleanSupplier suppressed = null;
+                if (sessionResolver != null) {
+                    WebSession session = sessionResolver.apply(request);
+                    if (session != null) suppressed = session::isIdle;
+                }
 
-                response.setBody(sseConnections::handleConnection);
+                BooleanSupplier finalSuppressed = suppressed;
+                response.setBody(out -> sseConnections.handleConnection(out, finalSuppressed));
                 return response;
             });
         }
@@ -143,6 +160,14 @@ public class MapRequestHandler extends RoutingRequestHandler implements Closeabl
      */
     public void broadcastChat(ChatMessage message) {
         sseConnections.broadcast("chat", message.toJson());
+    }
+
+    /**
+     * Sets the resolver used to find the web session of an incoming request.
+     * <p>While that session is idle, no SSE events are sent to it.</p>
+     */
+    public void setSessionResolver(@Nullable Function<HttpRequest, WebSession> sessionResolver) {
+        this.sessionResolver = sessionResolver;
     }
 
     @Override

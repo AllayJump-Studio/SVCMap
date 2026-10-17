@@ -44,6 +44,9 @@ public enum HttpStatusCode {
     UNAUTHORIZED (401, "Unauthorized"),
     FORBIDDEN (403, "Forbidden"),
     NOT_FOUND (404, "Not Found"),
+    METHOD_NOT_ALLOWED (405, "Method Not Allowed"),
+    CONFLICT (409, "Conflict"),
+    TOO_MANY_REQUESTS (429, "Too Many Requests"),
 
     INTERNAL_SERVER_ERROR (500, "Internal Server Error"),
     NOT_IMPLEMENTED (501, "Not Implemented"),

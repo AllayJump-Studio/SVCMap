@@ -31,8 +31,10 @@ import java.nio.charset.StandardCharsets;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
+import java.util.function.BooleanSupplier;
 
 import lombok.SneakyThrows;
+import org.jetbrains.annotations.Nullable;
 
 /**
  * Represents a single Server-Sent Events (SSE) connection.
@@ -57,8 +59,32 @@ public class SseConnection implements Closeable {
     private volatile Runnable onClose;
     private volatile Thread runningThread;
 
+    /**
+     * Optional check that suppresses outgoing events while it returns true.
+     * <p>Used by the web-login idle-timeout: while a session is idle, the server must not push
+     * any more map data to it (no traffic for abandoned browser tabs).</p>
+     */
+    private volatile @Nullable BooleanSupplier suppressed;
+
     public boolean isClosed() {
         return closed;
+    }
+
+    public void setSuppressed(@Nullable BooleanSupplier suppressed) {
+        this.suppressed = suppressed;
+    }
+
+    /**
+     * Whether events to this connection are currently suppressed (the client is idle).
+     */
+    public boolean isSuppressed() {
+        BooleanSupplier supplier = this.suppressed;
+        if (supplier == null) return false;
+        try {
+            return supplier.getAsBoolean();
+        } catch (RuntimeException ex) {
+            return false;
+        }
     }
 
     /**
@@ -80,6 +106,7 @@ public class SseConnection implements Closeable {
      */
     public void enqueue(SseEvent event) {
         if (closed) return;
+        if (isSuppressed()) return; // idle session: keep the connection, but send nothing
         if (!queue.offer(event)) {
             close();
         }

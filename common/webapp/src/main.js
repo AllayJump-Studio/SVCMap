@@ -4,6 +4,7 @@
 
 import * as Vue from 'vue';
 import App from './App.vue';
+import LoginOverlay from './components/Login/LoginOverlay.vue';
 import * as BlueMap from "./js/BlueMap";
 import {BlueMapApp} from "./js/BlueMapApp";
 import {i18nModule, loadLanguageSettings} from "./i18n";
@@ -710,11 +711,73 @@ function showGreetingPage() {
 // ---- 主加载流程 ----
 let mapLoaded = false;
 
+/**
+ * Queries the web-login session.
+ * Returns null if the login system is not available (disabled server-side, or unreachable),
+ * so the map is loaded exactly as before in that case.
+ */
+async function fetchAuthSession() {
+  try {
+    const response = await fetch("api/auth/session", { headers: { "Accept": "application/json" } });
+    if (!response.ok) return null;
+    return await response.json();
+  } catch (e) {
+    return null;
+  }
+}
+
+/**
+ * Shows the full-screen login overlay and resolves once the user is logged in.
+ */
+async function showLoginOverlay(session) {
+  await loadLanguageSettings(); // so the overlay can render its texts
+
+  return new Promise(resolve => {
+    const container = document.createElement("div");
+    document.body.appendChild(container);
+
+    let overlay = null;
+
+    const done = () => {
+      try {
+        if (overlay) overlay.unmount();
+      } catch (e) {
+        console.error(e);
+      }
+      container.remove();
+      resolve();
+    };
+
+    overlay = Vue.createApp(LoginOverlay, { session, onSuccess: done });
+    overlay.use(i18nModule);
+    overlay.mount(container);
+  });
+}
+
+/**
+ * @returns {Promise<boolean>} false if the map must not be loaded (the login overlay is showing)
+ */
+async function ensureLoggedIn() {
+  const session = await fetchAuthSession();
+
+  // no login system at all, or already logged in
+  if (session !== null && session.authenticated) return true;
+  if (session === null) return true;
+
+  await showLoginOverlay(session);
+  return true;
+}
+
 async function loadMap() {
   if (mapLoaded) return;
   mapLoaded = true;
 
   try {
+    if (!(await ensureLoggedIn())) {
+      mapLoaded = false;
+      return;
+    }
+
     const bluemap = new BlueMapApp(document.getElementById("map-container"));
     window.bluemap = bluemap;
     window.BlueMap = BlueMap;

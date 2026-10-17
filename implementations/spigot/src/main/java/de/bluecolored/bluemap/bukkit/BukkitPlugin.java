@@ -35,6 +35,9 @@ import de.bluecolored.bluemap.core.logger.Logger;
 import de.bluecolored.bluemap.core.util.Caches;
 import de.bluecolored.bluemap.core.util.Key;
 import de.bluecolored.bluemap.core.world.BlockState;
+import net.kyori.adventure.text.Component;
+import net.kyori.adventure.text.serializer.gson.GsonComponentSerializer;
+import net.md_5.bungee.chat.ComponentSerializer;
 import org.bstats.bukkit.Metrics;
 import org.bukkit.Bukkit;
 import org.bukkit.Material;
@@ -198,6 +201,15 @@ public class BukkitPlugin extends JavaPlugin implements Server, Listener {
     @Override
     public void unregisterAllListeners() {
         eventForwarder.removeAllListeners();
+    }
+
+    @Override
+    public boolean sendMessageToPlayer(UUID playerUuid, Component message) {
+        org.bukkit.entity.Player player = getServer().getPlayer(playerUuid);
+        if (player == null) return false;
+        // spigot has no adventure Component overload, so it has to go through a chat-component
+        player.spigot().sendMessage(ComponentSerializer.parse(GsonComponentSerializer.gson().serialize(message.compact())));
+        return true;
     }
 
     @Override

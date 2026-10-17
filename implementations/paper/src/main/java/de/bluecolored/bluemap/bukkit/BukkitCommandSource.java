@@ -33,8 +33,10 @@ import net.kyori.adventure.text.Component;
 import org.bukkit.Location;
 import org.bukkit.World;
 import org.bukkit.command.ConsoleCommandSender;
+import org.bukkit.entity.Player;
 
 import java.util.Optional;
+import java.util.UUID;
 
 @SuppressWarnings("UnstableApiUsage")
 public class BukkitCommandSource implements CommandSource {
@@ -53,6 +55,18 @@ public class BukkitCommandSource implements CommandSource {
     @Override
     public boolean hasPermission(String permission) {
         return delegate.getSender().hasPermission(permission);
+    }
+
+    @Override
+    public Optional<UUID> getPlayerUuid() {
+        if (delegate.getSender() instanceof Player player) return Optional.of(player.getUniqueId());
+        return Optional.empty();
+    }
+
+    @Override
+    public Optional<String> getPlayerName() {
+        if (delegate.getSender() instanceof Player player) return Optional.of(player.getName());
+        return Optional.empty();
     }
 
     @Override

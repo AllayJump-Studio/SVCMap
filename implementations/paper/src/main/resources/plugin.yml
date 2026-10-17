@@ -9,3 +9,14 @@ website: "https://github.com/BlueMap-Minecraft"
 
 libraries:
   - "com.flowpowered:flow-math:${flow_math_version}"
+
+permissions:
+  bluemap.webregister:
+    description: "Start the web-registration process for your own web-account"
+    default: true
+  bluemap.webregister.other:
+    description: "Start the web-registration process for another (online) player"
+    default: op
+  bluemap.webunregister:
+    description: "Delete a web-account (also used to reset a password)"
+    default: op

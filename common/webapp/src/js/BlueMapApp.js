@@ -46,6 +46,12 @@ import {reactive} from "vue";
  */
 const CHAT_MAX_MESSAGES = 100;
 
+/**
+ * How often (ms) the webapp tells the server that the user is still active while moving the view.
+ * Must be well below the server-side idle-timeout, which defaults to one hour.
+ */
+const ACTIVITY_REPORT_INTERVAL = 60_000;
+
 export class BlueMapApp {
 
     /**
@@ -98,6 +104,7 @@ export class BlueMapApp {
         this.mapsMap = new Map();
 
         this.lastCameraMove = 0;
+        this.lastActivityReport = 0;
 
         this.mainMenu = reactive(new MainMenu());
 
@@ -926,6 +933,24 @@ export class BlueMapApp {
         if (this.hashUpdateTimeout) clearTimeout(this.hashUpdateTimeout);
         this.hashUpdateTimeout = setTimeout(this.updatePageAddress, 1500);
         this.lastCameraMove = Date.now();
+        this.reportActivity();
+    }
+
+    /**
+     * Tells the server that the user is still active.
+     * <p>This is what resumes the map updates after the idle-timeout kicked in: while a session is
+     * idle the server stops pushing map data (and refuses it), and only real user activity - moving
+     * the view - clears that state again.</p>
+     * <p>Throttled, because camera movement fires very often.</p>
+     */
+    reportActivity() {
+        const now = Date.now();
+        if (now - this.lastActivityReport < ACTIVITY_REPORT_INTERVAL) return;
+        this.lastActivityReport = now;
+
+        fetch("api/auth/touch", {method: "POST"}).catch(() => {
+            // no login system, or the session is gone - nothing to do
+        });
     }
 
     loadBlocker = async () => {

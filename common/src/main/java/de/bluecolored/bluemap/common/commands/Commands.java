@@ -45,6 +45,7 @@ import org.jetbrains.annotations.Nullable;
 import java.util.Map;
 import java.util.Random;
 import java.util.Set;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import static de.bluecolored.bluemap.common.commands.TextFormat.*;
@@ -70,6 +71,16 @@ public class Commands {
 
         builder.setArgumentParserForId("storage-id", new StringSetArgumentParser("storage", () ->
                 plugin.isLoaded() ? plugin.getBlueMap().getConfig().getStorageConfigs().keySet() : Set.of()));
+
+        builder.setArgumentParserForId("online-player", new StringSetArgumentParser("online player", () ->
+                plugin.isLoaded()
+                        ? plugin.getServerInterface().getOnlinePlayers().values().stream()
+                                .map(player -> player.getName().toPlainString())
+                                .collect(Collectors.toSet())
+                        : Set.of()));
+
+        builder.setArgumentParserForId("web-account", new StringSetArgumentParser("web-account", () ->
+                plugin.getWebAuth() != null ? plugin.getWebAuth().getAccountNames() : Set.of()));
 
         builder.setContextResolverForType(ServerWorld.class, c -> c.getWorld().orElse(null));
         builder.setContextResolverForType(World.class, c -> plugin.isLoaded() ? c.getWorld().map(plugin::getWorld).orElse(null) : null);
@@ -102,7 +113,9 @@ public class Commands {
                 new TasksCommand(plugin),
                 new TroubleshootCommand(plugin),
                 new UnfreezeCommand(plugin),
-                new VersionCommand(plugin)
+                new VersionCommand(plugin),
+                new WebRegisterCommand(plugin),
+                new WebUnregisterCommand(plugin)
         )
                 .map(builder::createCommand)
                 .forEach(commands::addSubCommand);

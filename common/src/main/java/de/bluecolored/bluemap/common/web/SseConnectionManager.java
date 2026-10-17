@@ -29,7 +29,10 @@ import java.io.IOException;
 import java.io.OutputStream;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.BooleanSupplier;
 import java.util.function.Consumer;
+
+import org.jetbrains.annotations.Nullable;
 
 /**
  * Tracks active {@link SseConnection}s and provides broadcast delivery.
@@ -60,7 +63,16 @@ public class SseConnectionManager implements Closeable {
      * automatically removed from this manager once it closes.
      */
     public void handleConnection(OutputStream out) throws IOException {
+        handleConnection(out, null);
+    }
+
+    /**
+     * Like {@link #handleConnection(OutputStream)}, but with a suppression-check: while the supplier
+     * returns true no events are sent to this connection (used for the idle-timeout of a web session).
+     */
+    public void handleConnection(OutputStream out, @Nullable BooleanSupplier suppressed) throws IOException {
         SseConnection connection = new SseConnection();
+        connection.setSuppressed(suppressed);
         add(connection);
         connection.run(out);
     }

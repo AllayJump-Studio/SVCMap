@@ -51,6 +51,14 @@ import de.bluecolored.bluemap.common.rendermanager.serialization.Vector2iAdapter
 import de.bluecolored.bluemap.common.serverinterface.Server;
 import de.bluecolored.bluemap.common.serverinterface.ServerEventListener;
 import de.bluecolored.bluemap.common.serverinterface.ServerWorld;
+import de.bluecolored.bluemap.common.web.auth.AuthRequestHandler;
+import de.bluecolored.bluemap.common.web.auth.WebAuthGateHandler;
+import de.bluecolored.bluemap.common.web.auth.WebAuthService;
+import de.bluecolored.bluemap.common.web.auth.WebSession;
+import de.bluecolored.bluemap.common.web.auth.WebSessionManager;
+import de.bluecolored.bluemap.common.web.http.HttpRequest;
+import de.bluecolored.bluemap.common.web.http.HttpRequestHandler;
+import de.bluecolored.bluemap.common.web.http.HttpHeader;
 import de.bluecolored.bluemap.common.web.*;
 import de.bluecolored.bluemap.common.web.http.HttpServer;
 import de.bluecolored.bluemap.core.BlueMap;
@@ -129,6 +137,17 @@ public class Plugin implements ServerEventListener {
     @DebugDump(exclude = true)
     private volatile int chatMessageLengthLimit = 256;
 
+    /**
+     * Web-account / login system, or {@code null} if it is disabled in the webserver-config
+     * (or if the account file could not be loaded).
+     */
+    private @Nullable WebAuthService webAuth = null;
+
+    /**
+     * Session storage for the web-login, or {@code null} if the login system is disabled.
+     */
+    private @Nullable WebSessionManager webSessions = null;
+
     private Timer timer;
     private Map<String, MapUpdateService> mapUpdateServices;
     private PlayerSkinUpdater skinUpdater;
@@ -180,6 +199,48 @@ public class Plugin implements ServerEventListener {
                 this.chatEnabled = chatConfig.isEnabled();
                 this.chatMessageLengthLimit = chatConfig.getMessageLengthLimit();
                 this.chatHistory = this.chatEnabled ? new ChatMessageHistory(chatConfig.getHistoryLength()) : null;
+
+                //init web-accounts
+                this.webAuth = null;
+                this.webSessions = null;
+                WebserverConfig.AuthConfig authConfig = webserverConfig.getAuth();
+                Path authConfigFolder = serverInterface.getConfigFolder();
+
+                // The account store is always loaded, so "/bluemap webregister" works BEFORE the
+                // login is enabled. Otherwise the documented order (register first, then enable)
+                // would be impossible. "enabled" only controls the gate and the login endpoints.
+                Path authFile = authConfigFolder.resolve("webauth.json");
+                WebAuthService webAuth = new WebAuthService(
+                        authFile,
+                        authConfig.getPasscodeExpiryMinutes(),
+                        authConfig.getMinPasswordLength()
+                );
+                try {
+                    webAuth.load();
+                    this.webAuth = webAuth;
+                    Logger.global.logDebug("Loaded %d web-account(s) from %s".formatted(
+                            webAuth.getAccountNames().size(), authFile));
+                } catch (IOException | RuntimeException ex) {
+                    // fail closed: without accounts nobody can log in, so no map data is served either
+                    Logger.global.logError("Failed to load the web-accounts from " + authFile +
+                            " - all map data is denied until this is fixed!", ex);
+                }
+
+                if (authConfig.isEnabled()) {
+                    // sessions first, so the gate can fail closed even if the account file is broken
+                    WebSessionManager sessionManager = new WebSessionManager(
+                            authConfigFolder.resolve("sessions.json"),
+                            authConfig.getSessionDays(),
+                            authConfig.getRememberDays(),
+                            authConfig.getIdleTimeoutMinutes()
+                    );
+                    try {
+                        sessionManager.load();
+                    } catch (IOException | RuntimeException ex) {
+                        Logger.global.logError("Failed to load sessions.json - everyone has to log in again!", ex);
+                    }
+                    this.webSessions = sessionManager;
+                }
 
                 //apply new file-logger config
                 if (coreConfig.getLog().getFile() != null) {
@@ -275,6 +336,9 @@ public class Plugin implements ServerEventListener {
                         // chat is broadcast to all maps, so we need to keep track of the handlers
                         if (this.chatHistory != null) this.mapRequestHandlers.add(mapRequestHandler);
 
+                        // idle sessions must not receive any more map data over SSE
+                        if (this.webSessions != null) mapRequestHandler.setSessionResolver(this::resolveWebSession);
+
                         webRequestHandler.register(
                                 "maps/" + Pattern.quote(id) + "/(.*)",
                                 "$1",
@@ -293,11 +357,33 @@ public class Plugin implements ServerEventListener {
                     }
                     webLogger = Logger.combine(webLoggerList);
 
+                    // web-login endpoints (registered after the catch-all, so they take precedence)
+                    WebSessionManager sessionManager = this.webSessions;
+                    if (this.webAuth != null && sessionManager != null) {
+                        webRequestHandler.register(
+                                "api/auth/(.*)",
+                                "$1",
+                                new AuthRequestHandler(this.webAuth, sessionManager)
+                        );
+                    }
+
+                    // gate everything that is not part of the login flow
+                    HttpRequestHandler gatedHandler = webRequestHandler;
+                    if (this.webSessions != null && webserverConfig.getAuth().isRequireLogin()) {
+                        gatedHandler = new WebAuthGateHandler(webRequestHandler, this.webSessions, true);
+                        if (this.webAuth != null) {
+                            Logger.global.logInfo("The webserver now requires a login for all map data.");
+                        } else {
+                            Logger.global.logWarning("Web-accounts could not be loaded - denying all map data " +
+                                    "(fix webauth.json and run /bluemap reload)!");
+                        }
+                    }
+
                     try {
                         webServer = new HttpServer(
                                 "BlueMap-Webserver",
                                 new LoggingRequestHandler(
-                                        new BlueMapResponseModifier(webRequestHandler, webserverConfig.getAdditionalHeaders()),
+                                        new BlueMapResponseModifier(gatedHandler, webserverConfig.getAdditionalHeaders()),
                                         webserverConfig.getLog().getFormat(),
                                         webLogger
                                 )
@@ -573,6 +659,10 @@ public class Plugin implements ServerEventListener {
                 chatHistory = null;
                 mapRequestHandlers.clear();
 
+                //drop the web-account system
+                webAuth = null;
+                webSessions = null;
+
                 //done
                 loaded = false;
             }
@@ -740,6 +830,22 @@ public class Plugin implements ServerEventListener {
     @Override
     public void onPlayerLeave(UUID playerUuid) {
         checkPausedByPlayerCountSoon();
+    }
+
+    /**
+     * Resolves the web session of a request, or {@code null} if there is none.
+     */
+    private @Nullable WebSession resolveWebSession(HttpRequest request) {
+        WebSessionManager sessions = this.webSessions;
+        if (sessions == null) return null;
+
+        HttpHeader cookieHeader = request.getHeader("cookie");
+        if (cookieHeader == null) return null;
+
+        List<String> values = cookieHeader.getValues();
+        if (values.isEmpty()) return null;
+
+        return sessions.resolveCookieHeader(String.join("; ", values));
     }
 
     @Override

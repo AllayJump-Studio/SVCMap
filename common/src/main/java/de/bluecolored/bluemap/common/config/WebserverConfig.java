@@ -50,6 +50,8 @@ public class WebserverConfig {
 
     private Map<String, String> additionalHeaders = Map.of();
 
+    private AuthConfig auth = new AuthConfig();
+
     public InetAddress resolveIp() throws UnknownHostException {
         if (ip.isEmpty() || ip.equals("0.0.0.0") || ip.equals("::0")) {
             return new InetSocketAddress(0).getAddress();
@@ -67,6 +69,48 @@ public class WebserverConfig {
         private String file = null;
         private boolean append = false;
         private String format = "%1$s \"%3$s %4$s %5$s\" %6$s %7$s";
+
+    }
+
+    /**
+     * Web-account / login configuration.
+     * <p>Defaults to disabled so that an existing installation does not suddenly lock its map
+     * after an update. Register your account in-game first, then enable this.</p>
+     */
+    @ConfigSerializable
+    @Getter
+    public static class AuthConfig {
+
+        private boolean enabled = false;
+
+        /**
+         * If true, every request that is not part of the login flow is rejected until the user logs in.
+         */
+        private boolean requireLogin = true;
+
+        private int sessionDays = 7;
+
+        private int rememberDays = 30;
+
+        /**
+         * After this many minutes without any activity, the server stops pushing map data to the
+         * browser. The client has to show activity (moving the view) to resume.
+         * Set to 0 or lower to disable.
+         */
+        private int idleTimeoutMinutes = 60;
+
+        /**
+         * How long a passcode issued by {@code /bluemap webregister} stays valid.
+         */
+        private int passcodeExpiryMinutes = 10;
+
+        private int minPasswordLength = 8;
+
+        /**
+         * Only used to print a usable url in the registration command. Leave empty to fall back to
+         * {@code http://<server-ip>:<webserver-port>/}.
+         */
+        private String publicUrl = "";
 
     }
 

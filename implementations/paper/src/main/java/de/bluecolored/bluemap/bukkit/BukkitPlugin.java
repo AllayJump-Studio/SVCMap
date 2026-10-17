@@ -44,6 +44,7 @@ import io.papermc.paper.ServerBuildInfo;
 import io.papermc.paper.command.brigadier.CommandSourceStack;
 import io.papermc.paper.plugin.lifecycle.event.types.LifecycleEvents;
 import io.papermc.paper.threadedregions.scheduler.ScheduledTask;
+import net.kyori.adventure.text.Component;
 import org.bstats.bukkit.Metrics;
 import org.bukkit.Bukkit;
 import org.bukkit.Material;
@@ -176,6 +177,14 @@ public class BukkitPlugin extends JavaPlugin implements Server, Listener {
     @Override
     public void unregisterAllListeners() {
         eventForwarder.removeAllListeners();
+    }
+
+    @Override
+    public boolean sendMessageToPlayer(UUID playerUuid, Component message) {
+        org.bukkit.entity.Player player = getServer().getPlayer(playerUuid);
+        if (player == null) return false;
+        player.sendMessage(message);
+        return true;
     }
 
     @Override

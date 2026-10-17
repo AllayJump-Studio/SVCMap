@@ -32,6 +32,7 @@ import de.bluecolored.bluemap.core.util.Tristate;
 import de.bluecolored.bluemap.core.world.BlockState;
 import de.bluecolored.bluemap.core.world.World;
 import de.bluecolored.bluemap.core.world.mca.MCAWorld;
+import net.kyori.adventure.text.Component;
 import org.jetbrains.annotations.Nullable;
 
 import java.nio.file.Path;
@@ -128,5 +129,17 @@ public interface Server {
      * Removes all registered listeners
      */
     void unregisterAllListeners();
+
+    /**
+     * Sends a message to a single player, if that player is online.
+     * <p>Used e.g. to hand a web-registration passcode to the player it belongs to.</p>
+     *
+     * @param playerUuid the uuid of the player
+     * @param message the message to send
+     * @return {@code true} if the message was delivered (the player is online), {@code false} otherwise
+     */
+    default boolean sendMessageToPlayer(UUID playerUuid, Component message) {
+        return false;
+    }
 
 }

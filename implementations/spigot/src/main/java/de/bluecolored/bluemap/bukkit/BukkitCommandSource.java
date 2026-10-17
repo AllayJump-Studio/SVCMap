@@ -36,8 +36,10 @@ import org.bukkit.World;
 import org.bukkit.command.BlockCommandSender;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Entity;
+import org.bukkit.entity.Player;
 
 import java.util.Optional;
+import java.util.UUID;
 
 public class BukkitCommandSource implements CommandSource {
 
@@ -58,6 +60,20 @@ public class BukkitCommandSource implements CommandSource {
     @Override
     public boolean hasPermission(String permission) {
         return delegate.hasPermission(permission);
+    }
+
+    @Override
+    @SuppressWarnings("deprecation")
+    public Optional<UUID> getPlayerUuid() {
+        if (delegate instanceof Player player) return Optional.of(player.getUniqueId());
+        return Optional.empty();
+    }
+
+    @Override
+    @SuppressWarnings("deprecation")
+    public Optional<String> getPlayerName() {
+        if (delegate instanceof Player player) return Optional.of(player.getName());
+        return Optional.empty();
     }
 
     @Override

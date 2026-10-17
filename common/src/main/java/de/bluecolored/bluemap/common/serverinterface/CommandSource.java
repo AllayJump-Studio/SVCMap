@@ -29,6 +29,7 @@ import de.bluecolored.bluemap.core.world.World;
 import net.kyori.adventure.text.Component;
 
 import java.util.Optional;
+import java.util.UUID;
 
 public interface CommandSource {
 
@@ -41,6 +42,21 @@ public interface CommandSource {
     }
 
     default Optional<Vector3d> getPosition() {
+        return Optional.empty();
+    }
+
+    /**
+     * The uuid of the player that is executing this command, if the command was executed by a player
+     * (and not by the console or a command block).
+     */
+    default Optional<UUID> getPlayerUuid() {
+        return Optional.empty();
+    }
+
+    /**
+     * The name of the player that is executing this command, if the command was executed by a player.
+     */
+    default Optional<String> getPlayerName() {
         return Optional.empty();
     }
 
