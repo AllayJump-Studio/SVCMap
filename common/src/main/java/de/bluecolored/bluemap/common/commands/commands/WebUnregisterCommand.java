@@ -51,7 +51,7 @@ public class WebUnregisterCommand {
 
     @Command("webunregister <player>")
     @Permission("bluemap.webunregister")
-    public Component unregister(CommandSource source, @Argument("account") @Parser("web-account") String playerName) {
+    public Component unregister(CommandSource source, @Argument("player") @Parser("web-account") String playerName) {
         WebAuthService webAuth = plugin.getWebAuth();
         if (webAuth == null) {
             return lines(
