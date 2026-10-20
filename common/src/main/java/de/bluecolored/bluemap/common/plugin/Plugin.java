@@ -52,6 +52,7 @@ import de.bluecolored.bluemap.common.serverinterface.Server;
 import de.bluecolored.bluemap.common.serverinterface.ServerEventListener;
 import de.bluecolored.bluemap.common.serverinterface.ServerWorld;
 import de.bluecolored.bluemap.common.web.auth.AuthRequestHandler;
+import de.bluecolored.bluemap.common.web.auth.WebAccount;
 import de.bluecolored.bluemap.common.web.auth.WebAuthGateHandler;
 import de.bluecolored.bluemap.common.web.auth.WebAuthService;
 import de.bluecolored.bluemap.common.web.auth.WebSession;
@@ -61,6 +62,8 @@ import de.bluecolored.bluemap.common.web.http.HttpRequestHandler;
 import de.bluecolored.bluemap.common.web.http.HttpHeader;
 import de.bluecolored.bluemap.common.web.*;
 import de.bluecolored.bluemap.common.web.http.HttpServer;
+import net.kyori.adventure.text.Component;
+import net.kyori.adventure.text.format.TextColor;
 import de.bluecolored.bluemap.core.BlueMap;
 import de.bluecolored.bluemap.core.logger.Logger;
 import de.bluecolored.bluemap.core.map.BmMap;
@@ -93,6 +96,7 @@ import java.time.Instant;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.TimeUnit;
 import java.util.regex.Pattern;
@@ -104,6 +108,14 @@ public class Plugin implements ServerEventListener {
     public static final String PLUGIN_NAME = "BlueMap";
 
     private static final String DEBUG_FILE_LOG_NAME = "file-debug-log";
+
+    /**
+     * Rate-limit for chat messages sent from the webapp: at most N messages per window, and a
+     * minimum delay between two messages.
+     */
+    private static final int WEB_CHAT_MAX_MESSAGES = 5;
+    private static final long WEB_CHAT_WINDOW_MILLIS = 30_000L;
+    private static final long WEB_CHAT_MIN_INTERVAL_MILLIS = 1_500L;
 
     @Getter(AccessLevel.NONE)
     private final InterruptableReentrantLock loadingLock = new InterruptableReentrantLock();
@@ -147,6 +159,11 @@ public class Plugin implements ServerEventListener {
      * Session storage for the web-login, or {@code null} if the login system is disabled.
      */
     private @Nullable WebSessionManager webSessions = null;
+
+    /**
+     * Recent webapp chat timestamps per account, for rate-limiting.
+     */
+    private final Map<String, Deque<Long>> webChatTimestamps = new ConcurrentHashMap<>();
 
     private Timer timer;
     private Map<String, MapUpdateService> mapUpdateServices;
@@ -338,6 +355,9 @@ public class Plugin implements ServerEventListener {
 
                         // idle sessions must not receive any more map data over SSE
                         if (this.webSessions != null) mapRequestHandler.setSessionResolver(this::resolveWebSession);
+
+                        // webapp chat uplink (needs the login system, so the identity is trusted)
+                        if (this.chatEnabled && this.webAuth != null) mapRequestHandler.setChatSubmitter(this::submitWebChat);
 
                         webRequestHandler.register(
                                 "maps/" + Pattern.quote(id) + "/(.*)",
@@ -662,6 +682,7 @@ public class Plugin implements ServerEventListener {
                 //drop the web-account system
                 webAuth = null;
                 webSessions = null;
+                webChatTimestamps.clear();
 
                 //done
                 loaded = false;
@@ -869,6 +890,98 @@ public class Plugin implements ServerEventListener {
         int limit = chatMessageLengthLimit;
         if (limit <= 0 || message.length() <= limit) return message;
         return message.substring(0, limit);
+    }
+
+    /**
+     * Delivers a chat message from a logged-in webapp-user into the game and to all webapp clients.
+     *
+     * @param accountName the account name of the sender, taken from the session
+     * @param message the raw message text
+     * @return {@code null} on success, or an error code for the webapp
+     */
+    private @Nullable String submitWebChat(String accountName, String message) {
+        if (!chatEnabled) return "chat-disabled";
+
+        // the identity is the web-account, so the login system has to be the source of truth
+        WebAuthService webAuth = this.webAuth;
+        if (webAuth == null) return "login-required";
+
+        String text = sanitizeWebChatMessage(message);
+        if (text.isEmpty()) return "empty";
+
+        int limit = chatMessageLengthLimit;
+        if (limit > 0 && text.length() > limit) return "too-long";
+
+        if (!allowWebChat(accountName)) return "rate-limited";
+
+        WebAccount account = webAuth.getAccount(accountName);
+        ChatMessage chatMessage = ChatMessage.web(
+                account != null ? account.getPlayerUuid() : null,
+                accountName,
+                text
+        );
+
+        // keep the recent chat, so a (re)connecting client can load it via live/chat.json
+        ChatMessageHistory history = this.chatHistory;
+        if (history != null) history.add(chatMessage);
+
+        // to every map, so it reaches the client that is currently viewing any of them
+        for (MapRequestHandler mapRequestHandler : mapRequestHandlers) {
+            mapRequestHandler.broadcastChat(chatMessage);
+        }
+
+        // into the game
+        Component gameMessage = Component.text()
+                .append(Component.text("[WEB] ", TextColor.color(0x88ccff)))
+                .append(Component.text(accountName + ": ", TextColor.color(0xffffff)))
+                .append(Component.text(text, TextColor.color(0xdddddd)))
+                .build();
+        serverInterface.broadcastMessage(gameMessage);
+
+        // web-chat does not go through the minecraft chat event, so it would not show up in the console
+        Logger.global.logInfo("[Web] %s: %s".formatted(accountName, text));
+
+        return null;
+    }
+
+    /**
+     * Removes color-codes and control characters, so a webapp message cannot break the chat format.
+     */
+    private static String sanitizeWebChatMessage(@Nullable String message) {
+        if (message == null) return "";
+
+        StringBuilder builder = new StringBuilder(message.length());
+        for (int i = 0; i < message.length(); i++) {
+            char c = message.charAt(i);
+            if (c == '§') { // skip the color-code character and the code itself
+                i++;
+                continue;
+            }
+            if (c < 0x20 || c == 0x7f) continue; // newlines, tabs, ...
+            builder.append(c);
+        }
+        return builder.toString().trim();
+    }
+
+    /**
+     * Simple per-account rate-limit for webapp chat messages.
+     */
+    private boolean allowWebChat(String accountName) {
+        long now = System.currentTimeMillis();
+        Deque<Long> timestamps = webChatTimestamps.computeIfAbsent(accountName, key -> new ArrayDeque<>());
+
+        synchronized (timestamps) {
+            Long last = timestamps.peekLast();
+            if (last != null && now - last < WEB_CHAT_MIN_INTERVAL_MILLIS) return false;
+
+            while (!timestamps.isEmpty() && now - timestamps.peekFirst() > WEB_CHAT_WINDOW_MILLIS) {
+                timestamps.pollFirst();
+            }
+            if (timestamps.size() >= WEB_CHAT_MAX_MESSAGES) return false;
+
+            timestamps.addLast(now);
+            return true;
+        }
     }
 
     private void checkPausedByPlayerCountSoon() {

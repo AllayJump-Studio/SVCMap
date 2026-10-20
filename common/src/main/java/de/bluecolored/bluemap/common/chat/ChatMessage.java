@@ -89,6 +89,16 @@ public class ChatMessage {
         return new ChatMessage(SOURCE_PLAYER, playerUuid, playerName, message, System.currentTimeMillis());
     }
 
+    /**
+     * Creates a message that was sent by a webapp-user.
+     *
+     * @param playerUuid the uuid of the account-holder, or {@code null} if unknown
+     * @param playerName the account name (which is the minecraft player name)
+     */
+    public static ChatMessage web(@Nullable UUID playerUuid, String playerName, String message) {
+        return new ChatMessage(SOURCE_WEB, playerUuid, playerName, message, System.currentTimeMillis());
+    }
+
     public void writeJson(JsonWriter json) throws IOException {
         json.beginObject();
         json.name("type").value("chat");

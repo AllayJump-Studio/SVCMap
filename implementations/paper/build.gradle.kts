@@ -64,6 +64,13 @@ tasks.shadowJar {
 }
 
 tasks.processResources {
+    // Gradle does not track the values passed to expand(), so without this the plugin.yml
+    // would keep the version of the last time the resource was actually rewritten
+    // (a jar built as 5.28-23 reported 5.28-22 inside).
+    inputs.property("pluginVersion", project.version.toString())
+    inputs.property("pluginApiVersion", apiVersion)
+    inputs.property("pluginFlowMathVersion", libs.flow.math.get().version!!)
+
     from("src/main/resources") {
         include("plugin.yml")
         duplicatesStrategy = DuplicatesStrategy.INCLUDE

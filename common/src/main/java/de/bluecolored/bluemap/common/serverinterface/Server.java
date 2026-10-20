@@ -142,4 +142,19 @@ public interface Server {
         return false;
     }
 
+    /**
+     * Sends a message to every online player.
+     * <p>Used to deliver a chat message that was sent from the webapp into the game.</p>
+     *
+     * @param message the message to send
+     * @return {@code true} if the message was delivered to at least one player
+     */
+    default boolean broadcastMessage(Component message) {
+        boolean delivered = false;
+        for (Player player : getOnlinePlayers().values()) {
+            if (sendMessageToPlayer(player.getUuid(), message)) delivered = true;
+        }
+        return delivered;
+    }
+
 }

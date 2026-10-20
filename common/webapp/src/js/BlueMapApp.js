@@ -47,6 +47,19 @@ import {reactive} from "vue";
 const CHAT_MAX_MESSAGES = 100;
 
 /**
+ * Maps a server-side chat error code to an i18n key.
+ */
+const CHAT_ERROR_KEYS = {
+    "rate-limited": "chat.sendErrors.rateLimited",
+    "too-long": "chat.sendErrors.tooLong",
+    "empty": "chat.sendErrors.empty",
+    "login-required": "chat.sendErrors.loginRequired",
+    "idle": "chat.sendErrors.idle",
+    "chat-disabled": "chat.sendUnavailable",
+    "bad-format": "chat.sendUnavailable"
+};
+
+/**
  * How often (ms) the webapp tells the server that the user is still active while moving the view.
  * Must be well below the server-side idle-timeout, which defaults to one hour.
  */
@@ -539,7 +552,7 @@ export class BlueMapApp {
 
     /**
      * 发送一条聊天消息（Web -> 游戏方向）。
-     * 服务端接收端点属于下一步（上行链路）的工作，当前发送会失败并给出一条本地提示。
+     * 身份由服务端从登录会话里取，这里不发送任何名字，避免冒充。
      * @param text {string}
      * @returns {Promise<boolean>} 是否发送成功
      */
@@ -556,8 +569,28 @@ export class BlueMapApp {
                 headers: {"Content-Type": "application/json; charset=utf-8"},
                 body: JSON.stringify({message})
             });
-            if (!response.ok) throw new Error(`HTTP ${response.status}`);
-            return true;
+
+            // the message comes back to us over SSE, so there is nothing to add locally
+            if (response.ok) return true;
+
+            let code = "";
+            try {
+                const body = await response.json();
+                code = (body && body.error) || "";
+            } catch (e) {
+                // not a json response, fall through to the generic message
+            }
+
+            this.addChatMessage({
+                type: "chat",
+                source: "system",
+                playerUuid: null,
+                playerName: "",
+                message: i18n.t(CHAT_ERROR_KEYS[code] || "chat.sendUnavailable"),
+                // 本地生成的消息也放在服务端时间轴上，避免与其它消息的过期判断打架
+                timestamp: this.getChatServerNow()
+            });
+            return false;
         } catch (e) {
             alert(this.events, `Failed to send chat message: ${e}`, "debug");
             this.addChatMessage({
@@ -566,7 +599,6 @@ export class BlueMapApp {
                 playerUuid: null,
                 playerName: "",
                 message: i18n.t("chat.sendUnavailable"),
-                // 本地生成的消息也放在服务端时间轴上，避免与其它消息的过期判断打架
                 timestamp: this.getChatServerNow()
             });
             return false;

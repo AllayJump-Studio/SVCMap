@@ -61,6 +61,11 @@ tasks.shadowJar {
 }
 
 tasks.processResources {
+    // Gradle does not track the values passed to expand(), so the plugin.yml would otherwise
+    // keep the version of the last time the resource was actually rewritten.
+    inputs.property("pluginVersion", project.version.toString())
+    inputs.property("pluginApiVersion", apiVersion)
+
     from("src/main/resources") {
         include("plugin.yml")
         duplicatesStrategy = DuplicatesStrategy.INCLUDE

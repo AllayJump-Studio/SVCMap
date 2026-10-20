@@ -26,6 +26,7 @@ package de.bluecolored.bluemap.common.web;
 
 import de.bluecolored.bluemap.common.chat.ChatMessage;
 import de.bluecolored.bluemap.common.chat.ChatMessageHistory;
+import de.bluecolored.bluemap.common.chat.WebChatSubmitter;
 import de.bluecolored.bluemap.common.web.auth.WebSession;
 import de.bluecolored.bluemap.common.web.http.HttpRequest;
 import de.bluecolored.bluemap.common.web.http.HttpResponse;
@@ -35,8 +36,11 @@ import de.bluecolored.bluemap.core.storage.MapStorage;
 import org.jetbrains.annotations.Nullable;
 
 import com.flowpowered.math.vector.Vector2i;
+import com.google.gson.JsonElement;
+import com.google.gson.JsonParser;
 
 import java.io.Closeable;
+import java.nio.charset.StandardCharsets;
 import java.util.function.BooleanSupplier;
 import java.util.function.Consumer;
 import java.util.function.Function;
@@ -50,6 +54,11 @@ public class MapRequestHandler extends RoutingRequestHandler implements Closeabl
      * Resolves the web session of a request, used to suppress map data for idle sessions.
      */
     private volatile @Nullable Function<HttpRequest, WebSession> sessionResolver;
+
+    /**
+     * Delivers a chat message from a webapp-user into the game, or {@code null} if web-chat is disabled.
+     */
+    private volatile @Nullable WebChatSubmitter chatSubmitter;
 
     private @Nullable LiveDataSupplierBroadcaster<String> markerDataBroadcaster;
     private @Nullable LiveDataSupplierBroadcaster<String> playerDataBroadcaster;
@@ -125,6 +134,72 @@ public class MapRequestHandler extends RoutingRequestHandler implements Closeabl
         if (chatHistory != null) {
             register("live/chat\\.json", "", new JsonDataRequestHandler(chatHistory));
         }
+
+        // uplink: a logged-in webapp-user sends a chat message (the identity comes from the session)
+        if (chatHistory != null) {
+            register("live/chat", "", this::handleChatSubmit);
+        }
+    }
+
+    /**
+     * Handles {@code POST live/chat}: takes a message from a logged-in webapp-user and hands it to
+     * the game.
+     */
+    private HttpResponse handleChatSubmit(HttpRequest request) {
+        if (!"POST".equalsIgnoreCase(request.getMethod())) return jsonError(HttpStatusCode.METHOD_NOT_ALLOWED, "method-not-allowed");
+
+        WebChatSubmitter submitter = this.chatSubmitter;
+        if (submitter == null) return jsonError(HttpStatusCode.FORBIDDEN, "chat-disabled");
+
+        // never trust a name from the request body, it always comes from the session
+        WebSession session = sessionResolver == null ? null : sessionResolver.apply(request);
+        if (session == null) return jsonError(HttpStatusCode.UNAUTHORIZED, "login-required");
+
+        if (session.isIdle()) return jsonError(HttpStatusCode.UNAUTHORIZED, "idle");
+
+        String message = readChatMessage(request);
+        if (message == null) return jsonError(HttpStatusCode.BAD_REQUEST, "bad-format");
+
+        String error = submitter.submit(session.getAccountName(), message);
+        if (error == null) return jsonOk();
+
+        return jsonError(switch (error) {
+            case "rate-limited" -> HttpStatusCode.TOO_MANY_REQUESTS;
+            case "too-long", "empty", "bad-format" -> HttpStatusCode.BAD_REQUEST;
+            case "login-required" -> HttpStatusCode.UNAUTHORIZED;
+            default -> HttpStatusCode.FORBIDDEN;
+        }, error);
+    }
+
+    private static @Nullable String readChatMessage(HttpRequest request) {
+        byte[] body = request.getBody();
+        if (body == null || body.length == 0 || body.length > 2048) return null;
+
+        try {
+            JsonElement element = JsonParser.parseString(new String(body, StandardCharsets.UTF_8));
+            if (!element.isJsonObject()) return null;
+            JsonElement message = element.getAsJsonObject().get("message");
+            if (message == null || !message.isJsonPrimitive()) return null;
+            return message.getAsString();
+        } catch (RuntimeException ex) {
+            return null;
+        }
+    }
+
+    private static HttpResponse jsonOk() {
+        HttpResponse response = new HttpResponse(HttpStatusCode.OK);
+        response.setHeader("Content-Type", "application/json; charset=utf-8");
+        response.setHeader("Cache-Control", "no-store");
+        response.setBody("{\"ok\":true}");
+        return response;
+    }
+
+    private static HttpResponse jsonError(HttpStatusCode status, String code) {
+        HttpResponse response = new HttpResponse(status);
+        response.setHeader("Content-Type", "application/json; charset=utf-8");
+        response.setHeader("Cache-Control", "no-store");
+        response.setBody("{\"error\":\"" + code + "\"}");
+        return response;
     }
 
     /**
@@ -168,6 +243,14 @@ public class MapRequestHandler extends RoutingRequestHandler implements Closeabl
      */
     public void setSessionResolver(@Nullable Function<HttpRequest, WebSession> sessionResolver) {
         this.sessionResolver = sessionResolver;
+    }
+
+    /**
+     * Sets the submitter that delivers webapp chat messages into the game.
+     * <p>Without one, {@code POST live/chat} is rejected.</p>
+     */
+    public void setChatSubmitter(@Nullable WebChatSubmitter chatSubmitter) {
+        this.chatSubmitter = chatSubmitter;
     }
 
     @Override
