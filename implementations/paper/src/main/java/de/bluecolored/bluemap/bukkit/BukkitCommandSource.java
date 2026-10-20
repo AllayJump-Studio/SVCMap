@@ -35,6 +35,7 @@ import org.bukkit.World;
 import org.bukkit.command.ConsoleCommandSender;
 import org.bukkit.entity.Player;
 
+import java.util.Locale;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -66,6 +67,12 @@ public class BukkitCommandSource implements CommandSource {
     @Override
     public Optional<String> getPlayerName() {
         if (delegate.getSender() instanceof Player player) return Optional.of(player.getName());
+        return Optional.empty();
+    }
+
+    @Override
+    public Optional<Locale> getLocale() {
+        if (delegate.getSender() instanceof Player player) return Optional.of(player.locale());
         return Optional.empty();
     }
 

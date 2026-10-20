@@ -38,6 +38,7 @@ import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Entity;
 import org.bukkit.entity.Player;
 
+import java.util.Locale;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -73,6 +74,19 @@ public class BukkitCommandSource implements CommandSource {
     @SuppressWarnings("deprecation")
     public Optional<String> getPlayerName() {
         if (delegate instanceof Player player) return Optional.of(player.getName());
+        return Optional.empty();
+    }
+
+    @Override
+    @SuppressWarnings("deprecation")
+    public Optional<Locale> getLocale() {
+        if (delegate instanceof Player player) {
+            // spigot reports the client language as e.g. "zh_cn"
+            String locale = player.getLocale();
+            if (locale != null && !locale.isBlank()) {
+                return Optional.of(Locale.forLanguageTag(locale.replace('_', '-')));
+            }
+        }
         return Optional.empty();
     }
 

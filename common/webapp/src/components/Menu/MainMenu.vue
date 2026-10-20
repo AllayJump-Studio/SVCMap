@@ -27,6 +27,15 @@
 
     <InfoPage v-if="menu.currentPage().id === 'info'" />
 
+    <div v-if="menu.currentPage().id === 'root' && appState.auth.authenticated" class="account-footer">
+      <hr>
+      <div class="account-name">
+        <span>{{ $t("account.loggedInAs") }}</span>
+        <strong>{{ appState.auth.player }}</strong>
+      </div>
+      <SimpleButton @action="$bluemap.logout()">{{ $t("account.logout") }}</SimpleButton>
+    </div>
+
   </SideMenu>
 </template>
 
@@ -82,6 +91,23 @@ export default {
 
   .info-footer {
     text-align: center;
+  }
+}
+
+.account-footer {
+  .account-name {
+    padding: 0.2em 0.5em;
+    font-size: 0.8em;
+    text-align: center;
+    color: var(--theme-fg-light);
+
+    strong {
+      display: block;
+      margin-top: 0.15em;
+      font-size: 1.15em;
+      font-weight: normal;
+      color: var(--theme-fg);
+    }
   }
 }
 </style>

@@ -28,6 +28,7 @@ import com.flowpowered.math.vector.Vector3d;
 import de.bluecolored.bluemap.core.world.World;
 import net.kyori.adventure.text.Component;
 
+import java.util.Locale;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -57,6 +58,14 @@ public interface CommandSource {
      * The name of the player that is executing this command, if the command was executed by a player.
      */
     default Optional<String> getPlayerName() {
+        return Optional.empty();
+    }
+
+    /**
+     * The client language of the player that is executing this command, if known.
+     * <p>Used to answer in the language the player actually reads.</p>
+     */
+    default Optional<Locale> getLocale() {
         return Optional.empty();
     }
 

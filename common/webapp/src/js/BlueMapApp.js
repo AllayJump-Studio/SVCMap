@@ -145,6 +145,12 @@ export class BlueMapApp {
             menu: this.mainMenu,
             maps: [],
             theme: null,
+            // web 登录状态；没有登录系统时 authenticated 一直是 false
+            auth: {
+                enabled: false,
+                authenticated: false,
+                player: null
+            },
             screenshot: {
                 clipboard: true
             },
@@ -548,6 +554,36 @@ export class BlueMapApp {
     toggleChat() {
         if (this.appState.chat.state === "open") this.closeChat();
         else this.openChat();
+    }
+
+    /**
+     * 记录当前的登录状态（由 main.js 在启动时把 api/auth/session 的结果传进来）。
+     * @param session {object|null} 服务端返回的会话信息
+     */
+    setAuthSession(session) {
+        if (!session) {
+            this.appState.auth.enabled = false;
+            this.appState.auth.authenticated = false;
+            this.appState.auth.player = null;
+            return;
+        }
+
+        this.appState.auth.enabled = true;
+        this.appState.auth.authenticated = session.authenticated === true;
+        this.appState.auth.player = this.appState.auth.authenticated ? (session.player || null) : null;
+    }
+
+    /**
+     * 退出登录：清掉服务端会话，然后重新加载页面（会重新回到登录浮层）。
+     */
+    async logout() {
+        try {
+            await fetch("api/auth/logout", {method: "POST"});
+        } catch (e) {
+            // 网络失败也照样刷新，服务端会话会在过期后自行失效
+            console.error(e);
+        }
+        window.location.reload();
     }
 
     /**

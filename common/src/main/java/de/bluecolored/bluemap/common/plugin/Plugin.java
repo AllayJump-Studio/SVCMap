@@ -33,6 +33,7 @@ import de.bluecolored.bluemap.common.addons.AddonLoader;
 import de.bluecolored.bluemap.common.api.BlueMapAPIImpl;
 import de.bluecolored.bluemap.common.chat.ChatMessage;
 import de.bluecolored.bluemap.common.chat.ChatMessageHistory;
+import de.bluecolored.bluemap.common.commands.ServerMessages;
 import de.bluecolored.bluemap.common.config.*;
 import de.bluecolored.bluemap.common.debug.DebugDump;
 import de.bluecolored.bluemap.common.debug.StateDumper;
@@ -165,6 +166,11 @@ public class Plugin implements ServerEventListener {
      */
     private final Map<String, Deque<Long>> webChatTimestamps = new ConcurrentHashMap<>();
 
+    /**
+     * Localized texts for the in-game commands (overridable in {@code <configFolder>/lang/}).
+     */
+    private volatile ServerMessages serverMessages = ServerMessages.bundledOnly();
+
     private Timer timer;
     private Map<String, MapUpdateService> mapUpdateServices;
     private PlayerSkinUpdater skinUpdater;
@@ -222,6 +228,9 @@ public class Plugin implements ServerEventListener {
                 this.webSessions = null;
                 WebserverConfig.AuthConfig authConfig = webserverConfig.getAuth();
                 Path authConfigFolder = serverInterface.getConfigFolder();
+
+                // localized command-texts, admins can override them in <configFolder>/lang/
+                this.serverMessages = ServerMessages.load(authConfigFolder);
 
                 // The account store is always loaded, so "/bluemap webregister" works BEFORE the
                 // login is enabled. Otherwise the documented order (register first, then enable)

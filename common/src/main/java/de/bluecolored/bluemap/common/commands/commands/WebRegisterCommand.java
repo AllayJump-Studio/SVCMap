@@ -28,6 +28,7 @@ import de.bluecolored.bluecommands.annotations.Argument;
 import de.bluecolored.bluecommands.annotations.Command;
 import de.bluecolored.bluecommands.annotations.Parser;
 import de.bluecolored.bluemap.common.commands.Permission;
+import de.bluecolored.bluemap.common.commands.ServerMessages;
 import de.bluecolored.bluemap.common.plugin.Plugin;
 import de.bluecolored.bluemap.common.serverinterface.CommandSource;
 import de.bluecolored.bluemap.common.serverinterface.Player;
@@ -38,6 +39,7 @@ import net.kyori.adventure.text.Component;
 import org.jetbrains.annotations.Nullable;
 
 import java.io.IOException;
+import java.util.Locale;
 import java.util.UUID;
 
 import static de.bluecolored.bluemap.common.commands.TextFormat.*;
@@ -45,6 +47,7 @@ import static net.kyori.adventure.text.Component.text;
 
 /**
  * Starts the web-registration process by issuing a one-time passcode that is then entered on the website.
+ * <p>The answer is localized to the client language of the executing player.</p>
  */
 @RequiredArgsConstructor
 public class WebRegisterCommand {
@@ -54,40 +57,41 @@ public class WebRegisterCommand {
     @Command("webregister")
     @Permission("bluemap.webregister")
     public Component registerSelf(CommandSource source) {
+        Locale locale = locale(source);
         String playerName = source.getPlayerName().orElse(null);
         UUID playerUuid = source.getPlayerUuid().orElse(null);
 
         if (playerName == null || playerUuid == null) {
             return lines(
-                    text("❌ This command needs to be executed by a player.").color(NEGATIVE_COLOR),
-                    format("Use % to issue a passcode for an online player.",
-                            command("/bluemap webregister <player>")).color(BASE_COLOR)
+                    messages().negative(locale, "common.player-only"),
+                    messages().info(locale, "common.player-only-hint", command("/bluemap webregister <player>"))
             );
         }
 
-        return issue(source, playerName, playerUuid).message();
+        return issue(locale, playerName, playerUuid).message();
     }
 
     @Command("webregister <player>")
     @Permission("bluemap.webregister.other")
     public Component registerOther(CommandSource source, @Argument("player") @Parser("online-player") String playerName) {
+        Locale locale = locale(source);
+
         Player target = findOnlinePlayer(playerName);
         if (target == null) {
-            return format("❌ There is no online player named %.", playerName).color(NEGATIVE_COLOR);
+            return messages().negative(locale, "common.no-online-player", playerName);
         }
 
-        IssuedPasscode issued = issue(source, target.getName().toPlainString(), target.getUuid());
+        IssuedPasscode issued = issue(locale, target.getName().toPlainString(), target.getUuid());
         if (issued.passcode() == null) return issued.message();
 
         // let the player know as well, so they do not have to receive the code from the admin
         boolean notified = plugin.getServerInterface().sendMessageToPlayer(
                 target.getUuid(),
                 lines(
-                        format("✔ A web-account registration was started for you.").color(POSITIVE_COLOR),
-                        format("Passcode: %", text(issued.passcode()).color(HIGHLIGHT_COLOR)).color(BASE_COLOR),
-                        format("Open % and enter it there.",
-                                text(publicUrl()).color(HIGHLIGHT_COLOR)).color(BASE_COLOR),
-                        text("Do not reuse your Minecraft password for the website.").color(WARNING_COLOR)
+                        messages().positive(locale, "register.target-title"),
+                        messages().info(locale, "register.passcode", text(issued.passcode()).color(HIGHLIGHT_COLOR)),
+                        messages().info(locale, "register.target-open", text(publicUrl()).color(HIGHLIGHT_COLOR)),
+                        messages().warning(locale, "register.warning")
                 )
         );
 
@@ -95,62 +99,55 @@ public class WebRegisterCommand {
 
         return lines(
                 issued.message(),
-                text("ℹ The player could not be notified in-game, please pass the code on privately.")
-                        .color(WARNING_COLOR)
+                messages().warning(locale, "register.target-unreachable")
         );
     }
 
-    private IssuedPasscode issue(CommandSource source, String accountName, UUID playerUuid) {
+    private IssuedPasscode issue(Locale locale, String accountName, UUID playerUuid) {
         WebAuthService webAuth = plugin.getWebAuth();
         if (webAuth == null) {
             return new IssuedPasscode(null, lines(
-                    text("❌ The web-login system is disabled.").color(NEGATIVE_COLOR),
-                    format("Enable % in % and reload BlueMap.",
+                    messages().negative(locale, "common.disabled"),
+                    messages().info(locale, "common.disabled-hint",
                             text("auth.enabled").color(HIGHLIGHT_COLOR),
-                            text("webserver.conf").color(HIGHLIGHT_COLOR)).color(BASE_COLOR)
+                            text("webserver.conf").color(HIGHLIGHT_COLOR))
             ));
         }
 
         if (!WebAuthService.isValidName(accountName)) {
-            return new IssuedPasscode(null, format("❌ % is not a valid account name (1-16 of a-z, 0-9, _).", accountName)
-                    .color(NEGATIVE_COLOR));
+            return new IssuedPasscode(null, messages().negative(locale, "common.invalid-name", accountName));
         }
-
-        String issuedBy = source.getPlayerName().orElse("console");
 
         String passcode;
         try {
-            passcode = webAuth.issuePasscode(accountName, playerUuid, issuedBy);
+            passcode = webAuth.issuePasscode(accountName, playerUuid, "command");
         } catch (IOException ex) {
             Logger.global.logError("Failed to save the web-account file!", ex);
-            return new IssuedPasscode(null, text("❌ Failed to save the web-account file! See the server log for details.")
-                    .color(NEGATIVE_COLOR));
+            return new IssuedPasscode(null, messages().negative(locale, "common.save-failed"));
         }
 
         if (passcode == null) {
             return new IssuedPasscode(null, lines(
-                    format("❌ % already has a web-account.", accountName).color(NEGATIVE_COLOR),
-                    format("An administrator can delete it with % and start over.",
-                            command("/bluemap webunregister " + accountName)).color(BASE_COLOR)
+                    messages().negative(locale, "register.exists", accountName),
+                    messages().info(locale, "register.exists-hint", command("/bluemap webunregister " + accountName))
             ));
         }
 
         return new IssuedPasscode(passcode, lines(
-                format("✔ Web-registration started for %.", accountName).color(POSITIVE_COLOR),
-                format("Passcode: %", text(passcode).color(HIGHLIGHT_COLOR)).color(BASE_COLOR),
-                format("Valid for % minutes, and only once.",
-                        text(String.valueOf(passcodeExpiryMinutes())).color(HIGHLIGHT_COLOR)).color(BASE_COLOR),
-                format("Open % and enter the passcode there.",
-                        text(publicUrl()).color(HIGHLIGHT_COLOR)).color(BASE_COLOR),
-                text("Do not reuse your Minecraft password for the website.").color(WARNING_COLOR)
+                messages().positive(locale, "register.issued-title", accountName),
+                messages().info(locale, "register.passcode", text(passcode).color(HIGHLIGHT_COLOR)),
+                messages().info(locale, "register.expires", String.valueOf(passcodeExpiryMinutes())),
+                messages().info(locale, "register.open", text(publicUrl()).color(HIGHLIGHT_COLOR)),
+                messages().warning(locale, "register.warning")
         ));
     }
 
-    /**
-     * @param passcode the passcode, or {@code null} if none was issued
-     * @param message the message to show to whoever executed the command
-     */
-    private record IssuedPasscode(@Nullable String passcode, Component message) {
+    private ServerMessages messages() {
+        return plugin.getServerMessages();
+    }
+
+    private static Locale locale(CommandSource source) {
+        return source.getLocale().orElse(Locale.ENGLISH);
     }
 
     private @Nullable Player findOnlinePlayer(String name) {
@@ -170,6 +167,13 @@ public class WebRegisterCommand {
 
         int port = plugin.getBlueMap().getConfig().getWebserverConfig().getPort();
         return "http://<server-address>:" + port + "/";
+    }
+
+    /**
+     * @param passcode the passcode, or {@code null} if none was issued
+     * @param message the message to show to whoever executed the command
+     */
+    private record IssuedPasscode(@Nullable String passcode, Component message) {
     }
 
 }

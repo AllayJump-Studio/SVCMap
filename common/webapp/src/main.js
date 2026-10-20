@@ -755,16 +755,31 @@ async function showLoginOverlay(session) {
 }
 
 /**
+ * The session that was used to get past the login overlay (null if there is no login system).
+ */
+let authSession = null;
+
+/**
  * @returns {Promise<boolean>} false if the map must not be loaded (the login overlay is showing)
  */
 async function ensureLoggedIn() {
-  const session = await fetchAuthSession();
+  let session = await fetchAuthSession();
 
   // no login system at all, or already logged in
-  if (session !== null && session.authenticated) return true;
-  if (session === null) return true;
+  if (session === null) {
+    authSession = null;
+    return true;
+  }
+  if (session.authenticated) {
+    authSession = session;
+    return true;
+  }
 
   await showLoginOverlay(session);
+
+  // re-read the session, so the menu shows the account that just logged in
+  session = await fetchAuthSession();
+  authSession = session;
   return true;
 }
 
@@ -779,6 +794,7 @@ async function loadMap() {
     }
 
     const bluemap = new BlueMapApp(document.getElementById("map-container"));
+    bluemap.setAuthSession(authSession);
     window.bluemap = bluemap;
     window.BlueMap = BlueMap;
 

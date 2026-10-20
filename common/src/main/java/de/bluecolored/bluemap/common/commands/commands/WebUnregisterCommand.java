@@ -28,6 +28,7 @@ import de.bluecolored.bluecommands.annotations.Argument;
 import de.bluecolored.bluecommands.annotations.Command;
 import de.bluecolored.bluecommands.annotations.Parser;
 import de.bluecolored.bluemap.common.commands.Permission;
+import de.bluecolored.bluemap.common.commands.ServerMessages;
 import de.bluecolored.bluemap.common.plugin.Plugin;
 import de.bluecolored.bluemap.common.serverinterface.CommandSource;
 import de.bluecolored.bluemap.common.web.auth.WebAuthService;
@@ -36,13 +37,14 @@ import lombok.RequiredArgsConstructor;
 import net.kyori.adventure.text.Component;
 
 import java.io.IOException;
+import java.util.Locale;
 
-import static de.bluecolored.bluemap.common.commands.TextFormat.*;
-import static net.kyori.adventure.text.Component.text;
+import static de.bluecolored.bluemap.common.commands.TextFormat.lines;
 
 /**
  * Deletes a web-account. This is also the "password reset" path: delete the account and let the
  * player register again with {@code /bluemap webregister}.
+ * <p>The answer is localized to the client language of the executing player.</p>
  */
 @RequiredArgsConstructor
 public class WebUnregisterCommand {
@@ -52,31 +54,34 @@ public class WebUnregisterCommand {
     @Command("webunregister <player>")
     @Permission("bluemap.webunregister")
     public Component unregister(CommandSource source, @Argument("player") @Parser("web-account") String playerName) {
+        Locale locale = locale(source);
+        ServerMessages messages = plugin.getServerMessages();
+
         WebAuthService webAuth = plugin.getWebAuth();
         if (webAuth == null) {
             return lines(
-                    text("❌ The web-login system is disabled.").color(NEGATIVE_COLOR),
-                    format("Enable % in % and reload BlueMap.",
-                            text("auth.enabled").color(HIGHLIGHT_COLOR),
-                            text("webserver.conf").color(HIGHLIGHT_COLOR)).color(BASE_COLOR)
+                    messages.negative(locale, "common.disabled"),
+                    messages.info(locale, "common.disabled-hint", "auth.enabled", "webserver.conf")
             );
         }
 
         try {
             if (!webAuth.unregister(playerName)) {
-                return format("❌ There is no web-account for %.", playerName).color(NEGATIVE_COLOR);
+                return messages.negative(locale, "unregister.missing", playerName);
             }
         } catch (IOException ex) {
             Logger.global.logError("Failed to save the web-account file!", ex);
-            return text("❌ Failed to save the web-account file! See the server log for details.")
-                    .color(NEGATIVE_COLOR);
+            return messages.negative(locale, "common.save-failed");
         }
 
         return lines(
-                format("✔ Deleted the web-account of %.", playerName).color(POSITIVE_COLOR),
-                format("The player can register again with %.",
-                        command("/bluemap webregister")).color(BASE_COLOR)
+                messages.positive(locale, "unregister.done", playerName),
+                messages.info(locale, "unregister.done-hint", "/bluemap webregister")
         );
+    }
+
+    private static Locale locale(CommandSource source) {
+        return source.getLocale().orElse(Locale.ENGLISH);
     }
 
 }
