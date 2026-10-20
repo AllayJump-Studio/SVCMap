@@ -40,15 +40,12 @@ public class HttpRequestInputStream implements Closeable {
 
     private final InetAddress source;
     private final DataInputStream in;
-    private final Reader reader;
 
     private byte[] byteBuffer = new byte[1024];
-    private final char[] charBuffer = new char[1];
 
     public HttpRequestInputStream(InputStream in, InetAddress source) {
         this.source = source;
         this.in = new DataInputStream(in);
-        this.reader = new InputStreamReader(this.in, StandardCharsets.UTF_8);
     }
 
     public @Nullable HttpRequest read() throws IOException {
@@ -102,15 +99,25 @@ public class HttpRequestInputStream implements Closeable {
         return request;
     }
 
+    /**
+     * Reads a single line, byte-wise.
+     * <p>This must NOT go through a {@link java.io.Reader}: {@code InputStreamReader} buffers
+     * ahead internally, which would swallow the beginning of the request body. The body is read
+     * directly from {@code in} afterwards, so a reader in between makes that read block forever
+     * (it waits for bytes that were already consumed).</p>
+     */
     private String readLine() throws IOException {
+        ByteArrayOutputStream line = new ByteArrayOutputStream(64);
 
-        StringBuilder stringBuilder = new StringBuilder();
-        do {
-            if (reader.read(charBuffer, 0, 1) == -1) throw new EOFException();
-            stringBuilder.append(charBuffer, 0, 1);
-        } while (charBuffer[0] != '\n');
+        int b;
+        while ((b = in.read()) != -1) {
+            if (b == '\n') break;
+            if (b != '\r') line.write(b);
+        }
 
-        return stringBuilder.toString();
+        if (b == -1 && line.size() == 0) throw new EOFException();
+
+        return line.toString(StandardCharsets.UTF_8);
     }
 
     private byte[] readChunkedBody() throws IOException {

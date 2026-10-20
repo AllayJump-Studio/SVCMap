@@ -31,6 +31,11 @@ tasks.register("zipResourceExtensions", type = Zip::class) {
 tasks.processResources {
     dependsOn("zipResourceExtensions")
 
+    // Gradle does not track the values passed to expand(), so without these the version.json
+    // would keep whatever version was current the last time the resource was rewritten.
+    inputs.property("pluginVersion", project.version.toString())
+    inputs.property("pluginGitHash", gitHash() + if (gitClean()) "" else " (dirty)")
+
     from("src/main/resources") {
         include("de/bluecolored/bluemap/version.json")
         duplicatesStrategy = DuplicatesStrategy.INCLUDE
