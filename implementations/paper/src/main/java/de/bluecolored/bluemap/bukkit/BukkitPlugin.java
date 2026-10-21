@@ -188,6 +188,37 @@ public class BukkitPlugin extends JavaPlugin implements Server, Listener {
     }
 
     @Override
+    @SuppressWarnings("deprecation")
+    public boolean sendChatAsPlayer(UUID playerUuid, String message) {
+        org.bukkit.entity.Player player = getServer().getPlayer(playerUuid);
+        if (player == null) return false;
+
+        // chat handling expects the main thread, and the webapp calls this from a connection thread
+        if (getServer().isPrimaryThread()) {
+            player.chat(message);
+        } else {
+            getServer().getScheduler().runTask(this, () -> player.chat(message));
+        }
+
+        return true;
+    }
+
+    @Override
+    public boolean hasPermission(UUID playerUuid, String permission) {
+        org.bukkit.entity.Player player = getServer().getPlayer(playerUuid);
+        if (player != null) return player.hasPermission(permission);
+
+        // offline: ops always have it, everyone else falls back to the default declared in plugin.yml
+        if (getServer().getOfflinePlayer(playerUuid).isOp()) return true;
+
+        org.bukkit.permissions.Permission registered = getServer().getPluginManager().getPermission(permission);
+        if (registered == null) return true;
+
+        org.bukkit.permissions.PermissionDefault defaultValue = registered.getDefault();
+        return defaultValue == org.bukkit.permissions.PermissionDefault.TRUE;
+    }
+
+    @Override
     public Collection<ServerWorld> getLoadedServerWorlds() {
         Collection<ServerWorld> loadedWorlds = new ArrayList<>(3);
         for (World world : Bukkit.getWorlds()) {

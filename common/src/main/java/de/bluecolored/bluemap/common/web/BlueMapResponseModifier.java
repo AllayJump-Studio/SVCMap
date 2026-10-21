@@ -24,6 +24,7 @@
  */
 package de.bluecolored.bluemap.common.web;
 
+import de.bluecolored.bluemap.common.web.http.HttpHeader;
 import de.bluecolored.bluemap.common.web.http.HttpRequest;
 import de.bluecolored.bluemap.common.web.http.HttpRequestHandler;
 import de.bluecolored.bluemap.common.web.http.HttpResponse;
@@ -33,6 +34,7 @@ import lombok.Getter;
 import lombok.NonNull;
 import lombok.Setter;
 
+import java.util.Locale;
 import java.util.Map;
 
 @Getter @Setter
@@ -53,7 +55,8 @@ public class BlueMapResponseModifier implements HttpRequestHandler {
         HttpResponse response = delegate.handle(request);
 
         HttpStatusCode status = response.getStatusCode();
-        if (status.getCode() >= 400 && response.getBody() != null){
+        // json endpoints describe their error inside the body, so it must not be replaced
+        if (status.getCode() >= 400 && response.getBody() != null && !isJson(response)) {
             response.setBody(status.getCode() + " - " + status.getMessage() + "\n" + this.serverName);
         }
 
@@ -62,6 +65,17 @@ public class BlueMapResponseModifier implements HttpRequestHandler {
         additionalHeaders.forEach(response::setHeaderIfAbsent);
 
         return response;
+    }
+
+    private static boolean isJson(HttpResponse response) {
+        HttpHeader contentType = response.getHeader("Content-Type");
+        if (contentType == null) return false;
+
+        for (String value : contentType.getValues()) {
+            if (value != null && value.toLowerCase(Locale.ROOT).startsWith("application/json")) return true;
+        }
+
+        return false;
     }
 
     @Override

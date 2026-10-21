@@ -150,6 +150,12 @@ public class Plugin implements ServerEventListener {
     @DebugDump(exclude = true)
     private volatile int chatMessageLengthLimit = 256;
 
+    @DebugDump(exclude = true)
+    private volatile boolean chatUseVanillaChatEvent = true;
+
+    @DebugDump(exclude = true)
+    private volatile String chatIngamePrefix = "[WEB] ";
+
     /**
      * Web-account / login system, or {@code null} if it is disabled in the webserver-config
      * (or if the account file could not be loaded).
@@ -221,6 +227,8 @@ public class Plugin implements ServerEventListener {
                 PluginConfig.ChatConfig chatConfig = pluginConfig.getChat();
                 this.chatEnabled = chatConfig.isEnabled();
                 this.chatMessageLengthLimit = chatConfig.getMessageLengthLimit();
+                this.chatUseVanillaChatEvent = chatConfig.isUseVanillaChatEvent();
+                this.chatIngamePrefix = chatConfig.getIngamePrefix() == null ? "" : chatConfig.getIngamePrefix();
                 this.chatHistory = this.chatEnabled ? new ChatMessageHistory(chatConfig.getHistoryLength()) : null;
 
                 //init web-accounts
@@ -924,11 +932,32 @@ public class Plugin implements ServerEventListener {
         if (!allowWebChat(accountName)) return "rate-limited";
 
         WebAccount account = webAuth.getAccount(accountName);
-        ChatMessage chatMessage = ChatMessage.web(
-                account != null ? account.getPlayerUuid() : null,
-                accountName,
-                text
-        );
+        UUID playerUuid = account != null ? account.getPlayerUuid() : null;
+
+        // permission gate (bluemap.webchat), checked for the account's player
+        if (playerUuid == null || !serverInterface.hasPermission(playerUuid, "bluemap.webchat")) {
+            return "no-permission";
+        }
+
+        // deliver into the game:
+        // preferred: as the player, so the normal chat event runs (filters, mutes, other plugins)
+        // fallback: plain broadcast, if the player is offline or the chat event is disabled in the config
+        String prefix = chatIngamePrefix;
+        boolean viaChatEvent = chatUseVanillaChatEvent && serverInterface.sendChatAsPlayer(playerUuid, prefix + text);
+
+        if (!viaChatEvent) {
+            Component gameMessage = Component.text()
+                    .append(Component.text(prefix, TextColor.color(0x88ccff)))
+                    .append(Component.text(accountName + ": ", TextColor.color(0xffffff)))
+                    .append(Component.text(text, TextColor.color(0xdddddd)))
+                    .build();
+            serverInterface.broadcastMessage(gameMessage);
+
+            // the chat event is not involved here, so nothing else would log this message
+            Logger.global.logInfo("[Web] %s: %s".formatted(accountName, text));
+        }
+
+        ChatMessage chatMessage = ChatMessage.web(playerUuid, accountName, text);
 
         // keep the recent chat, so a (re)connecting client can load it via live/chat.json
         ChatMessageHistory history = this.chatHistory;
@@ -938,17 +967,6 @@ public class Plugin implements ServerEventListener {
         for (MapRequestHandler mapRequestHandler : mapRequestHandlers) {
             mapRequestHandler.broadcastChat(chatMessage);
         }
-
-        // into the game
-        Component gameMessage = Component.text()
-                .append(Component.text("[WEB] ", TextColor.color(0x88ccff)))
-                .append(Component.text(accountName + ": ", TextColor.color(0xffffff)))
-                .append(Component.text(text, TextColor.color(0xdddddd)))
-                .build();
-        serverInterface.broadcastMessage(gameMessage);
-
-        // web-chat does not go through the minecraft chat event, so it would not show up in the console
-        Logger.global.logInfo("[Web] %s: %s".formatted(accountName, text));
 
         return null;
     }

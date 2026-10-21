@@ -54,6 +54,7 @@ const CHAT_ERROR_KEYS = {
     "too-long": "chat.sendErrors.tooLong",
     "empty": "chat.sendErrors.empty",
     "login-required": "chat.sendErrors.loginRequired",
+    "no-permission": "chat.sendErrors.noPermission",
     "idle": "chat.sendErrors.idle",
     "chat-disabled": "chat.sendUnavailable",
     "bad-format": "chat.sendUnavailable"
