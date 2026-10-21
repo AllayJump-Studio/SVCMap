@@ -45,6 +45,12 @@ public class WebAccount {
     private UUID playerUuid;
 
     /**
+     * The player name as it was spelled when the account was created (original case).
+     * <p>The account itself is keyed by the lower-cased name, this is only for displaying it.</p>
+     */
+    private String playerName;
+
+    /**
      * The password hash, see {@link PasswordHash}.
      */
     private String passwordHash;

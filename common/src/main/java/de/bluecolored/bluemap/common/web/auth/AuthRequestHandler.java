@@ -107,7 +107,7 @@ public class AuthRequestHandler implements HttpRequestHandler {
         body.addProperty("chatEnabled", chatAvailable);
 
         if (session != null) {
-            body.addProperty("player", session.getAccountName());
+            body.addProperty("player", auth.getDisplayName(session.getAccountName()));
             body.addProperty("idle", session.isIdle());
             body.addProperty("expiresAt", session.getExpiresAt());
         }
@@ -142,7 +142,7 @@ public class AuthRequestHandler implements HttpRequestHandler {
 
         JsonObject result = new JsonObject();
         result.addProperty("authenticated", true);
-        result.addProperty("player", accountName);
+        result.addProperty("player", auth.getDisplayName(accountName));
         return json(HttpStatusCode.OK, result, sessionCookie(token, sessions.getLifetimeMillis(remember)));
     }
 
@@ -189,7 +189,7 @@ public class AuthRequestHandler implements HttpRequestHandler {
 
         JsonObject response = new JsonObject();
         response.addProperty("authenticated", true);
-        response.addProperty("player", accountName);
+        response.addProperty("player", auth.getDisplayName(accountName));
         return json(HttpStatusCode.OK, response, sessionCookie(token, sessions.getLifetimeMillis(false)));
     }
 

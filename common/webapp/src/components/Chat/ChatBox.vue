@@ -1,18 +1,27 @@
 <template>
   <div id="chat" :class="{open: isOpen, 'free-flight': isFreeFlight, moving: moving}">
 
-    <!-- 消息列表 -->
-    <div ref="messageList" class="chat-messages" :class="{'has-messages': renderedMessages.length > 0}">
-      <div
-        v-for="item of renderedMessages"
-        :key="item.key"
-        class="chat-message"
-        :class="{fading: item.fading, system: item.message.source === 'system'}"
-      >
-        <span v-if="item.message.playerName" class="chat-message-name">{{ item.message.playerName }}</span>
-        <span class="chat-message-text">{{ item.message.message }}</span>
+    <!-- 消息列表：出现/收起时用「从上至下裁切」的动画 -->
+    <Transition
+      name="chat-list"
+      :duration="LIST_ANIM_DURATION"
+      @enter="onListEnter"
+      @after-enter="onListAfterEnter"
+      @leave="onListLeave"
+      @after-leave="onListAfterLeave"
+    >
+      <div v-if="renderedMessages.length > 0" ref="messageList" class="chat-messages has-messages">
+        <div
+          v-for="item of renderedMessages"
+          :key="item.key"
+          class="chat-message"
+          :class="{fading: item.fading, system: item.message.source === 'system'}"
+        >
+          <span v-if="item.message.playerName" class="chat-message-name">{{ item.message.playerName }}</span>
+          <span class="chat-message-text">{{ item.message.message }}</span>
+        </div>
       </div>
-    </div>
+    </Transition>
 
     <!-- 输入框：只有「聊天」状态才存在 -->
     <form v-if="isOpen" class="chat-input-row" @submit.prevent="send">
@@ -66,6 +75,12 @@ const MAX_MESSAGE_LENGTH = 256;
  */
 const MOVE_DURATION = 300;
 
+/**
+ * 消息列表出现/收起时「从上至下裁切」动画的时长。
+ * 收起时裁切线从顶部扫到底部（顶部先消失），展开时反向。
+ */
+const LIST_ANIM_DURATION = 260;
+
 export default {
   name: "ChatBox",
   components: {SvgButton},
@@ -77,7 +92,8 @@ export default {
       now: Date.now(),
       // 是否正在做「左下角 ⇄ 左上角」的平滑位移
       moving: false,
-      MAX_MESSAGE_LENGTH
+      MAX_MESSAGE_LENGTH,
+      LIST_ANIM_DURATION
     }
   },
   computed: {
@@ -133,7 +149,8 @@ export default {
     },
     "appState.chat.messages.length"() {
       this.now = Date.now(); // 同理，避免用陈旧时间判断新消息/旧消息是否过期
-      this.scrollToBottom();
+      // 列表是 v-if 的，第一条消息时元素还没渲染出来，要等下一帧再滚到底部
+      this.$nextTick(() => this.scrollToBottom());
       this.updateTicker();
     },
     "appState.chat.clockOffset"() {
@@ -259,6 +276,79 @@ export default {
       }
     },
 
+    // ------------------------------------------------------------ 消息列表动画
+
+    /**
+     * 展开：从「高度 0 + 顶部裁切掉全部」过渡到完整高度。
+     * clip-path 的 inset(top ...) 以元素自身盒子为参照，top 从 100% 变到 0，
+     * 视觉上就是裁切线由底部向上退开，内容自下而上出现。
+     */
+    onListEnter(el) {
+      const height = el.getBoundingClientRect().height;
+
+      this.prepareListTransition(el);
+      el.style.height = "0px";
+      el.style.paddingTop = "0px";
+      el.style.paddingBottom = "0px";
+      el.style.clipPath = "inset(100% 0 0 0)";
+
+      // 下一帧再改目标值，浏览器才会把起始状态先画出来
+      requestAnimationFrame(() => {
+        el.style.transition = this.listTransition();
+        el.style.height = `${height}px`;
+        el.style.paddingTop = "";
+        el.style.paddingBottom = "";
+        el.style.clipPath = "inset(0 0 0 0)";
+      });
+    },
+
+    onListAfterEnter(el) {
+      this.resetListTransition(el);
+    },
+
+    /**
+     * 收起：裁切线由顶部扫到底部，顶部先消失。
+     */
+    onListLeave(el) {
+      const height = el.getBoundingClientRect().height;
+
+      this.prepareListTransition(el);
+      el.style.height = `${height}px`;
+      el.style.clipPath = "inset(0 0 0 0)";
+
+      requestAnimationFrame(() => {
+        el.style.transition = this.listTransition();
+        el.style.height = "0px";
+        el.style.paddingTop = "0px";
+        el.style.paddingBottom = "0px";
+        el.style.clipPath = "inset(100% 0 0 0)";
+      });
+    },
+
+    onListAfterLeave(el) {
+      this.resetListTransition(el);
+    },
+
+    listTransition() {
+      return `height ${LIST_ANIM_DURATION}ms ease, padding ${LIST_ANIM_DURATION}ms ease, ` +
+             `clip-path ${LIST_ANIM_DURATION}ms ease`;
+    },
+
+    prepareListTransition(el) {
+      el.style.transition = "none";
+      // 动画期间隐藏滚动条，否则高度变化时它会闪烁
+      el.style.overflowY = "hidden";
+    },
+
+    resetListTransition(el) {
+      el.style.transition = "";
+      el.style.height = "";
+      el.style.paddingTop = "";
+      el.style.paddingBottom = "";
+      el.style.clipPath = "";
+      el.style.overflowY = "";
+    },
+
     focusInput() {
       if (this.$refs.input) this.$refs.input.focus();
     },
@@ -318,6 +408,8 @@ export default {
       display: flex;
       flex-direction: column;
 
+      // 关键：有消息时这段会加内边距，不声明 border-box 的话会比输入框宽 1em
+      box-sizing: border-box;
       width: 100%;
       max-height: 30vh;
       overflow-y: auto;

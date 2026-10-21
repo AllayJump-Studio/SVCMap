@@ -95,6 +95,19 @@ public class WebAuthService {
     }
 
     /**
+     * The name to show for an account: the original spelling if it is known, otherwise the
+     * normalized account name.
+     */
+    public String getDisplayName(String playerName) {
+        WebAccount account = store.getAccount(normalizeName(playerName));
+        if (account != null) {
+            String displayName = account.getPlayerName();
+            if (displayName != null && !displayName.isBlank()) return displayName;
+        }
+        return normalizeName(playerName);
+    }
+
+    /**
      * Verifies a player-name/password pair. Uses a constant-time hash comparison and never
      * tells the caller *why* it failed.
      */
@@ -145,6 +158,8 @@ public class WebAuthService {
 
         PendingRegistration registration = new PendingRegistration();
         registration.setPlayerUuid(playerUuid);
+        // remember the original spelling for display, the account itself stays lower-cased
+        registration.setPlayerName(playerName.trim());
         registration.setCodeHash(PasswordHash.sha256Hex(normalizePasscode(passcode)));
         registration.setExpiresAt(System.currentTimeMillis() + passcodeExpiryMinutes * 60_000L);
         registration.setIssuedBy(issuedBy);
@@ -189,6 +204,7 @@ public class WebAuthService {
                 PasswordHash.hash(password),
                 System.currentTimeMillis()
         );
+        account.setPlayerName(registration.getPlayerName());
 
         store.putAccount(name, account);
         store.removePendingRegistration(name); // one-time passcode

@@ -942,12 +942,15 @@ public class Plugin implements ServerEventListener {
             return "no-permission";
         }
 
+        // keep the spelling the player registered with, the account name itself is lower-cased
+        String displayName = webAuth.getDisplayName(accountName);
+
         // deliver into the game (only this path: it must not also go through the chat event,
         // otherwise the message would reach the webapp a second time as a "player" message)
-        serverInterface.broadcastMessage(renderWebChat(accountName, text));
-        Logger.global.logInfo("[Web] %s: %s".formatted(accountName, text));
+        serverInterface.broadcastMessage(renderWebChat(displayName, text));
+        Logger.global.logInfo("[Web] %s: %s".formatted(displayName, text));
 
-        ChatMessage chatMessage = ChatMessage.web(playerUuid, accountName, text);
+        ChatMessage chatMessage = ChatMessage.web(playerUuid, displayName, text);
 
         // keep the recent chat, so a (re)connecting client can load it via live/chat.json
         ChatMessageHistory history = this.chatHistory;

@@ -44,6 +44,11 @@ public class PendingRegistration {
     private UUID playerUuid;
 
     /**
+     * The player name as it was spelled when the passcode was issued (original case).
+     */
+    private String playerName;
+
+    /**
      * {@link PasswordHash#sha256Hex(String)} of the normalized (lower-case, trimmed) passcode.
      */
     private String codeHash;
