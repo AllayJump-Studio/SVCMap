@@ -10,6 +10,8 @@ dependencies {
     api ( project( ":core" ) )
 
     api ( libs.adventure.api )
+
+    api ( libs.adventure.minimessage )
     api ( libs.bluecommands.core )
 
     compileOnly ( libs.bluecommands.brigadier )

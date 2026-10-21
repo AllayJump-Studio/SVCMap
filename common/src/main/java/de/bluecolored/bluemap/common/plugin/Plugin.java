@@ -64,7 +64,7 @@ import de.bluecolored.bluemap.common.web.http.HttpHeader;
 import de.bluecolored.bluemap.common.web.*;
 import de.bluecolored.bluemap.common.web.http.HttpServer;
 import net.kyori.adventure.text.Component;
-import net.kyori.adventure.text.format.TextColor;
+import net.kyori.adventure.text.minimessage.MiniMessage;
 import de.bluecolored.bluemap.core.BlueMap;
 import de.bluecolored.bluemap.core.logger.Logger;
 import de.bluecolored.bluemap.core.map.BmMap;
@@ -151,10 +151,7 @@ public class Plugin implements ServerEventListener {
     private volatile int chatMessageLengthLimit = 256;
 
     @DebugDump(exclude = true)
-    private volatile boolean chatUseVanillaChatEvent = true;
-
-    @DebugDump(exclude = true)
-    private volatile String chatIngamePrefix = "[WEB] ";
+    private volatile String chatIngameFormat = "<#88ccff>[WEB]</#88ccff> <white>{player}</white><gray>:</gray> <#dddddd>{message}</#dddddd>";
 
     /**
      * Web-account / login system, or {@code null} if it is disabled in the webserver-config
@@ -231,8 +228,7 @@ public class Plugin implements ServerEventListener {
                 PluginConfig.ChatConfig chatConfig = pluginConfig.getChat();
                 this.chatEnabled = chatConfig.isEnabled() && authConfig.isEnabled();
                 this.chatMessageLengthLimit = chatConfig.getMessageLengthLimit();
-                this.chatUseVanillaChatEvent = chatConfig.isUseVanillaChatEvent();
-                this.chatIngamePrefix = chatConfig.getIngamePrefix() == null ? "" : chatConfig.getIngamePrefix();
+                this.chatIngameFormat = chatConfig.getIngameFormat() == null ? "" : chatConfig.getIngameFormat();
                 this.chatHistory = this.chatEnabled ? new ChatMessageHistory(chatConfig.getHistoryLength()) : null;
                 if (chatConfig.isEnabled() && !authConfig.isEnabled()) {
                     Logger.global.logInfo("Web-chat is disabled, because it requires the web-login system " +
@@ -946,23 +942,10 @@ public class Plugin implements ServerEventListener {
             return "no-permission";
         }
 
-        // deliver into the game:
-        // preferred: as the player, so the normal chat event runs (filters, mutes, other plugins)
-        // fallback: plain broadcast, if the player is offline or the chat event is disabled in the config
-        String prefix = chatIngamePrefix;
-        boolean viaChatEvent = chatUseVanillaChatEvent && serverInterface.sendChatAsPlayer(playerUuid, prefix + text);
-
-        if (!viaChatEvent) {
-            Component gameMessage = Component.text()
-                    .append(Component.text(prefix, TextColor.color(0x88ccff)))
-                    .append(Component.text(accountName + ": ", TextColor.color(0xffffff)))
-                    .append(Component.text(text, TextColor.color(0xdddddd)))
-                    .build();
-            serverInterface.broadcastMessage(gameMessage);
-
-            // the chat event is not involved here, so nothing else would log this message
-            Logger.global.logInfo("[Web] %s: %s".formatted(accountName, text));
-        }
+        // deliver into the game (only this path: it must not also go through the chat event,
+        // otherwise the message would reach the webapp a second time as a "player" message)
+        serverInterface.broadcastMessage(renderWebChat(accountName, text));
+        Logger.global.logInfo("[Web] %s: %s".formatted(accountName, text));
 
         ChatMessage chatMessage = ChatMessage.web(playerUuid, accountName, text);
 
@@ -976,6 +959,28 @@ public class Plugin implements ServerEventListener {
         }
 
         return null;
+    }
+
+    /**
+     * Renders a webapp message for the in-game chat, using the configurable MiniMessage template.
+     * <p>The player name and the message are escaped, so they cannot inject formatting.</p>
+     */
+    private Component renderWebChat(String playerName, String message) {
+        String format = chatIngameFormat;
+        if (format.isBlank()) return Component.text(playerName + ": " + message);
+
+        MiniMessage miniMessage = MiniMessage.miniMessage();
+        String rendered = format
+                .replace("{player}", miniMessage.escapeTags(playerName))
+                .replace("{message}", miniMessage.escapeTags(message));
+
+        try {
+            return miniMessage.deserialize(rendered);
+        } catch (RuntimeException ex) {
+            // a broken format in the config must not swallow the message
+            Logger.global.logError("Invalid 'chat.ingame-format' in plugin.conf, falling back to plain text!", ex);
+            return Component.text("[WEB] " + playerName + ": " + message);
+        }
     }
 
     /**

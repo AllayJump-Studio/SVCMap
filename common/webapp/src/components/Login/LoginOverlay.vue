@@ -59,7 +59,6 @@
 
       <p v-if="error" class="message error">{{ error }}</p>
 
-      <p class="message warning">{{ $t("login.passwordWarning") }}</p>
     </div>
   </div>
 </template>

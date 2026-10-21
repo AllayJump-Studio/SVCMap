@@ -157,18 +157,6 @@ public interface Server {
         return delivered;
     }
 
-    /**
-     * Sends a chat message <b>as</b> a player, so it goes through the server's normal chat handling
-     * and therefore through the chat event (chat filters, mutes and other plugins see it).
-     *
-     * @param playerUuid the uuid of the player to send the message as
-     * @param message the plain message
-     * @return {@code true} if the message was handed over to the chat handling, {@code false} if
-     *         the player is not online
-     */
-    default boolean sendChatAsPlayer(UUID playerUuid, String message) {
-        return false;
-    }
 
     /**
      * Checks a permission for a player, which does not have to be online.

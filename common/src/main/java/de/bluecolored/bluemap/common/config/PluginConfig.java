@@ -72,18 +72,11 @@ public class PluginConfig {
         private int historyLength = 100;
 
         /**
-         * Whether a message from the webapp is sent into the game <i>as the player</i>, so it goes
-         * through the normal chat event and is subject to chat filters, mutes and other plugins.
-         * <p>If the player is offline this is not possible, and the message is broadcast directly
-         * (prefixed with the account name) instead.</p>
+         * The in-game rendering of a webapp message, as a MiniMessage template.
+         * <p>{player} is replaced with the account name and {message} with the text, both escaped,
+         * so they cannot inject formatting.</p>
          */
-        private boolean useVanillaChatEvent = true;
-
-        /**
-         * The prefix that is put in front of a webapp message when it is sent as the player, so it
-         * stays distinguishable from messages typed in-game. Empty disables the prefix.
-         */
-        private String ingamePrefix = "[WEB] ";
+        private String ingameFormat = "<#88ccff>[WEB]</#88ccff> <white>{player}</white><gray>:</gray> <#dddddd>{message}</#dddddd>";
 
     }
 

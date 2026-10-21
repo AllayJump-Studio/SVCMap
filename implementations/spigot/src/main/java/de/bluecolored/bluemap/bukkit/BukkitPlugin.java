@@ -212,21 +212,6 @@ public class BukkitPlugin extends JavaPlugin implements Server, Listener {
         return true;
     }
 
-    @Override
-    @SuppressWarnings("deprecation")
-    public boolean sendChatAsPlayer(UUID playerUuid, String message) {
-        org.bukkit.entity.Player player = getServer().getPlayer(playerUuid);
-        if (player == null) return false;
-
-        // chat handling expects the main thread, and the webapp calls this from a connection thread
-        if (getServer().isPrimaryThread()) {
-            player.chat(message);
-        } else {
-            getServer().getScheduler().runTask(this, () -> player.chat(message));
-        }
-
-        return true;
-    }
 
     @Override
     public boolean hasPermission(UUID playerUuid, String permission) {
