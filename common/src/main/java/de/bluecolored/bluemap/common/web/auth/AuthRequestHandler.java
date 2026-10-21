@@ -57,11 +57,13 @@ public class AuthRequestHandler implements HttpRequestHandler {
 
     private final WebAuthService auth;
     private final WebSessionManager sessions;
+    private final boolean chatAvailable;
     private final Map<String, FailureWindow> failures = new ConcurrentHashMap<>();
 
-    public AuthRequestHandler(WebAuthService auth, WebSessionManager sessions) {
+    public AuthRequestHandler(WebAuthService auth, WebSessionManager sessions, boolean chatAvailable) {
         this.auth = auth;
         this.sessions = sessions;
+        this.chatAvailable = chatAvailable;
     }
 
     @Override
@@ -102,6 +104,7 @@ public class AuthRequestHandler implements HttpRequestHandler {
         body.addProperty("authenticated", session != null);
         body.addProperty("hasAccounts", auth.hasAccounts());
         body.addProperty("minPasswordLength", auth.getMinPasswordLength());
+        body.addProperty("chatEnabled", chatAvailable);
 
         if (session != null) {
             body.addProperty("player", session.getAccountName());

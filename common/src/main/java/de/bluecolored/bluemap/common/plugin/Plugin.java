@@ -223,18 +223,25 @@ public class Plugin implements ServerEventListener {
                 WebappConfig webappConfig = configManager.getWebappConfig();
                 PluginConfig pluginConfig = configManager.getPluginConfig();
 
+                // the web-chat requires the login system: an account is what links a webapp user
+                // to a player in the game, so without it there is no trustworthy identity
+                WebserverConfig.AuthConfig authConfig = webserverConfig.getAuth();
+
                 //apply chat config
                 PluginConfig.ChatConfig chatConfig = pluginConfig.getChat();
-                this.chatEnabled = chatConfig.isEnabled();
+                this.chatEnabled = chatConfig.isEnabled() && authConfig.isEnabled();
                 this.chatMessageLengthLimit = chatConfig.getMessageLengthLimit();
                 this.chatUseVanillaChatEvent = chatConfig.isUseVanillaChatEvent();
                 this.chatIngamePrefix = chatConfig.getIngamePrefix() == null ? "" : chatConfig.getIngamePrefix();
                 this.chatHistory = this.chatEnabled ? new ChatMessageHistory(chatConfig.getHistoryLength()) : null;
+                if (chatConfig.isEnabled() && !authConfig.isEnabled()) {
+                    Logger.global.logInfo("Web-chat is disabled, because it requires the web-login system " +
+                            "(set auth.enabled to true in webserver.conf to use it).");
+                }
 
                 //init web-accounts
                 this.webAuth = null;
                 this.webSessions = null;
-                WebserverConfig.AuthConfig authConfig = webserverConfig.getAuth();
                 Path authConfigFolder = serverInterface.getConfigFolder();
 
                 // localized command-texts, admins can override them in <configFolder>/lang/
@@ -400,7 +407,7 @@ public class Plugin implements ServerEventListener {
                         webRequestHandler.register(
                                 "api/auth/(.*)",
                                 "$1",
-                                new AuthRequestHandler(this.webAuth, sessionManager)
+                                new AuthRequestHandler(this.webAuth, sessionManager, this.chatEnabled)
                         );
                     }
 

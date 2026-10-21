@@ -3,7 +3,7 @@
     <FreeFlightMobileControls v-if="mapViewer.mapState === 'loaded' && appState.controls.state === 'free'" />
     <ZoomButtons v-if="showMapMenu && appState.controls.showZoomButtons && appState.controls.state !== 'free'" />
     <!-- 自由飞行时不再隐藏，而是由 ChatBox 自己平滑移动到左上角操作栏下方 -->
-    <ChatBox v-if="showMapMenu && !appState.controls.hideChat" />
+    <ChatBox v-if="showMapMenu && appState.chat.enabled && !appState.controls.hideChat" />
     <ControlBar />
     <div v-if="mapViewer.mapState !== 'loaded'" class="map-state-message">{{ $t("map." + mapViewer.mapState) }}</div>
     <MainMenu :menu="appState.menu" />

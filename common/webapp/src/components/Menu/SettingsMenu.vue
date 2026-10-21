@@ -38,7 +38,7 @@
       <SwitchButton :on="appState.controls.showZoomButtons" @action="appState.controls.showZoomButtons = !appState.controls.showZoomButtons; $bluemap.saveUserSettings()">{{ $t("mapControls.showZoomButtons") }}</SwitchButton>
     </Group>
 
-    <Group :title="$t('chat.title')">
+    <Group v-if="appState.chat.enabled" :title="$t('chat.title')">
       <SwitchButton :on="!appState.controls.hideChat" @action="appState.controls.hideChat = !appState.controls.hideChat; $bluemap.saveUserSettings()">{{ $t("chat.showChat") }}</SwitchButton>
       <SwitchButton :on="appState.controls.chatCloseAfterSend" @action="appState.controls.chatCloseAfterSend = !appState.controls.chatCloseAfterSend; $bluemap.saveUserSettings()">{{ $t("chat.closeAfterSend") }}</SwitchButton>
     </Group>

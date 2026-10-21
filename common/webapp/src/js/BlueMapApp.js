@@ -134,6 +134,8 @@ export class BlueMapApp {
                 chatCloseAfterSend: true
             },
             chat: {
+                // 聊天是否可用：只有服务端启用了登录系统才可用（账号是网页发言者身份的前提）
+                enabled: false,
                 // 'spectator' | 'open'（'hidden' 由 controls.hideChat 表达，不是这里的第三个值）
                 state: "spectator",
                 // 收到的聊天消息，按时间正序；元素形如 {type, source, playerUuid, playerName, message, timestamp}
@@ -488,6 +490,8 @@ export class BlueMapApp {
      * @returns {Promise<void>}
      */
     async loadChatHistory(map) {
+        if (!this.appState.chat.enabled) return;
+
         try {
             const data = await this.loadChatData(map);
             if (data && Array.isArray(data.messages)) {
@@ -566,12 +570,14 @@ export class BlueMapApp {
             this.appState.auth.enabled = false;
             this.appState.auth.authenticated = false;
             this.appState.auth.player = null;
+            this.appState.chat.enabled = false;
             return;
         }
 
         this.appState.auth.enabled = true;
         this.appState.auth.authenticated = session.authenticated === true;
         this.appState.auth.player = this.appState.auth.authenticated ? (session.player || null) : null;
+        this.appState.chat.enabled = session.chatEnabled === true;
     }
 
     /**
