@@ -296,7 +296,7 @@ export const deepEquals = (object1, object2) => {
     }
 
     for (let property in object1) {
-        if (!object1.hasOwnProperty(property)) continue;
+        if (!Object.prototype.hasOwnProperty.call(object1, property)) continue;
         if (!deepEquals(object1[property], object2[property])) return false;
     }
 

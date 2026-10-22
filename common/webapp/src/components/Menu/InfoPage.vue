@@ -47,7 +47,7 @@ export default {
       }
     },
   },
-  beforeDestroy() {
+  beforeUnmount() {
     if (this.timer) clearTimeout(this.timer);
   },
 };

@@ -75,7 +75,7 @@ export class PopupMarker extends Marker {
             navigator.clipboard.writeText(text)
                 .catch(e => console.error(e));
         } else {
-            function listener(e) {
+            const listener = (e) => {
                 e.clipboardData.setData("text/plain", text);
                 e.preventDefault();
             }

@@ -25,14 +25,12 @@
 import MarkerItem from "./MarkerItem.vue";
 import TextInput from "./TextInput.vue";
 import MarkerSet from "./MarkerSet.vue";
-import Group from "./Group.vue";
-import SimpleButton from "./SimpleButton.vue";
 import {MainMenu} from "../../js/MainMenu";
 import ChoiceBox from "./ChoiceBox.vue";
 
 export default {
   name: "MarkerSetMenu",
-  components: {ChoiceBox, SimpleButton, MarkerSet, TextInput, MarkerItem, Group},
+  components: {ChoiceBox, MarkerSet, TextInput, MarkerItem},
   props: {
     menu: MainMenu
   },

@@ -29,6 +29,7 @@
 
 import {
     DefaultLoadingManager,
+    FileLoader,
     BufferGeometry,
     BufferAttribute,
     FloatType
