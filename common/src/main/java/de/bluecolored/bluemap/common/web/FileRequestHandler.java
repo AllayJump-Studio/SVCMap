@@ -39,10 +39,19 @@ import java.time.Instant;
 import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
+import java.util.Locale;
 import java.util.concurrent.TimeUnit;
+import java.util.regex.Pattern;
+import org.jetbrains.annotations.Nullable;
 
 @Getter @Setter
 public class FileRequestHandler implements HttpRequestHandler {
+
+    /**
+     * Files written by the web-app build carry a content-hash in their name (e.g. {@code index-pw5lMe0d.js}),
+     * so their content never changes for a given name.
+     */
+    private static final Pattern HASHED_FILE_NAME = Pattern.compile("-[A-Za-z0-9_-]{8}\\.[A-Za-z0-9]+$");
 
     private @NonNull Path webRoot;
 
@@ -109,6 +118,11 @@ public class FileRequestHandler implements HttpRequestHandler {
             return new HttpResponse(HttpStatusCode.FORBIDDEN);
         }
 
+        // decide how this file may be cached, the web-app files keep their name across updates,
+        // so without an explicit header the browser would keep serving stale versions
+        String relativePath = webRoot.relativize(filePath.normalize()).toString().replace('\\', '/');
+        String cacheControl = toCacheControl(relativePath);
+
         // check modified
         long lastModified = Files.getLastModifiedTime(filePath).to(TimeUnit.MILLISECONDS);
         HttpHeader modHeader = request.getHeader("If-Modified-Since");
@@ -116,7 +130,7 @@ public class FileRequestHandler implements HttpRequestHandler {
             try {
                 long since = Instant.from(DateTimeFormatter.RFC_1123_DATE_TIME.parse(modHeader.getValue())).toEpochMilli();
                 if (since + 1000 >= lastModified){
-                    return new HttpResponse(HttpStatusCode.NOT_MODIFIED);
+                    return notModified(cacheControl);
                 }
             } catch (DateTimeParseException ignored){}
         }
@@ -129,12 +143,13 @@ public class FileRequestHandler implements HttpRequestHandler {
         HttpHeader etagHeader = request.getHeader("If-None-Match");
         if (etagHeader != null){
             if(etagHeader.getValue().equals(eTag)) {
-                return new HttpResponse(HttpStatusCode.NOT_MODIFIED);
+                return notModified(cacheControl);
             }
         }
 
         //create response
         HttpResponse response = new HttpResponse(HttpStatusCode.OK);
+        if (cacheControl != null) response.setHeader("Cache-Control", cacheControl);
         response.setHeader("ETag", eTag);
         if (lastModified > 0) response.setHeader("Last-Modified", DateTimeFormatter.RFC_1123_DATE_TIME.format(Instant
                 .ofEpochMilli(lastModified)
@@ -155,6 +170,52 @@ public class FileRequestHandler implements HttpRequestHandler {
         } catch (FileNotFoundException e) {
             return new HttpResponse(HttpStatusCode.NOT_FOUND);
         }
+    }
+
+    private static HttpResponse notModified(@Nullable String cacheControl) {
+        HttpResponse response = new HttpResponse(HttpStatusCode.NOT_MODIFIED);
+        if (cacheControl != null) response.setHeader("Cache-Control", cacheControl);
+        return response;
+    }
+
+    /**
+     * Returns the {@code Cache-Control} value for the given web-root relative path, or {@code null} to keep the
+     * default behavior of this handler.
+     *
+     * <p>The web-app bundle ships a content-hashed file name for everything under {@code assets/}, those can be
+     * cached forever. Everything that keeps its name across web-app updates ({@code index.html}, the language files
+     * and {@code settings.json}) must be revalidated on every visit, so that browsers pick up a newly deployed
+     * web-app (and its translation keys) without the user having to clear the cache. Map- and live-data are left
+     * untouched.
+     */
+    private static @Nullable String toCacheControl(String relativePath) {
+        if (relativePath.startsWith("assets/")) {
+            String fileName = relativePath.substring(relativePath.lastIndexOf('/') + 1);
+            // files copied verbatim from the web-app's public folder keep their plain name, even when that name
+            // accidentally looks like a content-hash (e.g. Minecraft-BF3_bo-S.ttf), so they must not be cached forever
+            boolean contentHashed = HASHED_FILE_NAME.matcher(fileName).find() && !isCopiedVerbatim(fileName);
+            return contentHashed ? "public, max-age=31536000, immutable" : "public, max-age=86400";
+        }
+
+        if (relativePath.equals("index.html")
+                || relativePath.equals("settings.json")
+                || relativePath.startsWith("lang/")) {
+            return "no-cache";
+        }
+
+        return null;
+    }
+
+    /**
+     * Whether the given file was copied into the web-app bundle untouched (fonts, sounds), instead of being
+     * processed by the bundler which adds the content-hash to the file name.
+     */
+    private static boolean isCopiedVerbatim(String fileName) {
+        String extension = fileName.substring(fileName.lastIndexOf('.') + 1).toLowerCase(Locale.ROOT);
+        return switch (extension) {
+            case "ttf", "otf", "woff", "woff2", "mp3", "ogg", "wav", "flac" -> true;
+            default -> false;
+        };
     }
 
     private static String toContentType(String fileEnding) {
