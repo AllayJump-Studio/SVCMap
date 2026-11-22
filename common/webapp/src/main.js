@@ -772,6 +772,7 @@ async function ensureLoggedIn() {
   }
   if (session.authenticated) {
     authSession = session;
+    await resumeIdleSession(session);
     return true;
   }
 
@@ -780,7 +781,25 @@ async function ensureLoggedIn() {
   // re-read the session, so the menu shows the account that just logged in
   session = await fetchAuthSession();
   authSession = session;
+  await resumeIdleSession(session);
   return true;
+}
+
+/**
+ * Opening or refreshing the page is a user action, but the server only counts movement of the view
+ * as activity - so an idle session would refuse to serve settings.json and the page would end up on
+ * the error screen, where there is no view to move and hence no way back in.
+ * <p>Sending one touch here keeps the idle-timeout for sessions that are simply left open.</p>
+ */
+async function resumeIdleSession(session) {
+  if (!session || !session.idle) return;
+
+  try {
+    await fetch("api/auth/touch", {method: "POST"});
+    session.idle = false;
+  } catch (e) {
+    console.warn("Could not resume the idle session.", e);
+  }
 }
 
 async function loadMap() {
