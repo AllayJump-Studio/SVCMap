@@ -42,6 +42,7 @@ import java.io.IOException;
 import java.util.Locale;
 import java.util.UUID;
 
+import static de.bluecolored.bluemap.common.commands.ServerMessages.KEYWORD_COLOR;
 import static de.bluecolored.bluemap.common.commands.TextFormat.*;
 import static net.kyori.adventure.text.Component.text;
 
@@ -89,8 +90,8 @@ public class WebRegisterCommand {
                 target.getUuid(),
                 lines(
                         messages().positive(locale, "register.target-title"),
-                        messages().info(locale, "register.passcode", text(issued.passcode()).color(HIGHLIGHT_COLOR)),
-                        messages().info(locale, "register.target-open", text(publicUrl()).color(HIGHLIGHT_COLOR)),
+                        messages().info(locale, "register.passcode", text(issued.passcode()).color(KEYWORD_COLOR)),
+                        messages().info(locale, "register.target-open", text(publicUrl()).color(KEYWORD_COLOR)),
                         messages().warning(locale, "register.warning")
                 )
         );
@@ -109,8 +110,8 @@ public class WebRegisterCommand {
             return new IssuedPasscode(null, lines(
                     messages().negative(locale, "common.disabled"),
                     messages().info(locale, "common.disabled-hint",
-                            text("auth.enabled").color(HIGHLIGHT_COLOR),
-                            text("webserver.conf").color(HIGHLIGHT_COLOR))
+                            text("auth.enabled").color(KEYWORD_COLOR),
+                            text("webserver.conf").color(KEYWORD_COLOR))
             ));
         }
 
@@ -135,9 +136,9 @@ public class WebRegisterCommand {
 
         return new IssuedPasscode(passcode, lines(
                 messages().positive(locale, "register.issued-title", accountName),
-                messages().info(locale, "register.passcode", text(passcode).color(HIGHLIGHT_COLOR)),
+                messages().info(locale, "register.passcode", text(passcode).color(KEYWORD_COLOR)),
                 messages().info(locale, "register.expires", String.valueOf(passcodeExpiryMinutes())),
-                messages().info(locale, "register.open", text(publicUrl()).color(HIGHLIGHT_COLOR)),
+                messages().info(locale, "register.open", text(publicUrl()).color(KEYWORD_COLOR)),
                 messages().warning(locale, "register.warning")
         ));
     }

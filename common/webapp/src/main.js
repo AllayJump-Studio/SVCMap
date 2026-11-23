@@ -802,6 +802,44 @@ async function resumeIdleSession(session) {
   }
 }
 
+/**
+ * Key that counts how often the page tried to recover from an authentication failure, so a
+ * session that keeps failing can not reload the page in an endless loop.
+ */
+const AUTH_RECOVERY_KEY = "bluemap-auth-recovery";
+
+/**
+ * Loading the map can fail because the session became invalid while the page was open: it expired,
+ * it went idle or it was logged out in another tab. The error screen would be a dead end, because
+ * there is no map to move and hence no way to report activity again.
+ * <p>So in that case we ask for the credentials again, or report the activity and retry.</p>
+ *
+ * @returns {Promise<boolean>} true if the page is being recovered, false if this is a "real" error
+ */
+async function recoverFromAuthFailure() {
+  const session = await fetchAuthSession();
+  if (session === null) return false; // no login system, so this is not an auth problem
+
+  const attempts = parseInt(sessionStorage.getItem(AUTH_RECOVERY_KEY) || "0", 10);
+  if (attempts >= 2) return false; // do not loop forever if the recovery does not help
+
+  if (!session.authenticated) {
+    sessionStorage.setItem(AUTH_RECOVERY_KEY, String(attempts + 1));
+    await showLoginOverlay(session);
+    window.location.reload();
+    return true;
+  }
+
+  if (session.idle) {
+    sessionStorage.setItem(AUTH_RECOVERY_KEY, String(attempts + 1));
+    await resumeIdleSession(session);
+    window.location.reload();
+    return true;
+  }
+
+  return false;
+}
+
 async function loadMap() {
   if (mapLoaded) return;
   mapLoaded = true;
@@ -830,7 +868,11 @@ async function loadMap() {
     await app.$nextTick();
     await bluemap.load();
 
+    sessionStorage.removeItem(AUTH_RECOVERY_KEY);
+
   } catch (e) {
+    if (await recoverFromAuthFailure()) return;
+
     console.error("加载地图时出错！", e);
     const errorMessages = [
       "嗨，你发现了一个罕见的错误呢。报告给维护组？",

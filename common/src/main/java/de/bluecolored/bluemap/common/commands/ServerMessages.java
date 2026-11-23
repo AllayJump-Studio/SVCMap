@@ -55,9 +55,31 @@ public class ServerMessages {
     private static final String DEFAULT_LANGUAGE = "en";
     private static final String FOLDER_NAME = "lang";
 
-    public static final Component ICON_POSITIVE = Component.text("✔ ").color(TextFormat.POSITIVE_COLOR);
-    public static final Component ICON_NEGATIVE = Component.text("❌ ").color(TextFormat.NEGATIVE_COLOR);
-    public static final Component ICON_WARNING = Component.text("⚠ ").color(TextFormat.WARNING_COLOR);
+    /**
+     * The color palette of the web-account commands.
+     * <ul>
+     *     <li>{@link #MAIN_COLOR} for the main text</li>
+     *     <li>{@link #KEYWORD_COLOR} for the keywords inside the main text</li>
+     *     <li>{@link #WARNING_COLOR} for warnings in front of a dangerous command</li>
+     *     <li>{@link #ERROR_COLOR} for a failed command and for a dangerous command that succeeded</li>
+     * </ul>
+     */
+    public static final TextColor MAIN_COLOR = TextColor.color(0xA2D9B2);
+
+    public static final TextColor KEYWORD_COLOR = TextColor.color(0xFFC36B);
+    public static final TextColor WARNING_COLOR = TextColor.color(0xFFAF85);
+    public static final TextColor ERROR_COLOR = TextColor.color(0xFF9E6B);
+
+    /** Color of the marker that marks every informational line. */
+    public static final TextColor MARK_COLOR = TextColor.color(0x7FB2D0);
+
+    public static final Component ICON_POSITIVE = Component.text("✔ ").color(MAIN_COLOR);
+    public static final Component ICON_NEGATIVE = Component.text("❌ ").color(ERROR_COLOR);
+    public static final Component ICON_WARNING = Component.text("⚠ ").color(WARNING_COLOR);
+    public static final Component ICON_DANGER = Component.text("✔ ").color(ERROR_COLOR);
+
+    /** Marks an informational line, e.g. a hint or the passcode of a registration. */
+    public static final Component MARK = Component.text("✦ ").color(MARK_COLOR);
 
     private final Map<String, Map<String, String>> languages;
 
@@ -138,7 +160,7 @@ public class ServerMessages {
             if (arg instanceof Component component) {
                 result = result.append(component);
             } else {
-                result = result.append(Component.text(String.valueOf(arg), TextFormat.HIGHLIGHT_COLOR));
+                result = result.append(Component.text(String.valueOf(arg), KEYWORD_COLOR));
             }
             result = result.append(Component.text(parts[i + 1], color));
         }
@@ -147,19 +169,26 @@ public class ServerMessages {
     }
 
     public Component positive(Locale locale, String key, Object... args) {
-        return ICON_POSITIVE.append(line(locale, TextFormat.POSITIVE_COLOR, key, args));
+        return ICON_POSITIVE.append(line(locale, MAIN_COLOR, key, args));
+    }
+
+    /**
+     * A dangerous command succeeded (e.g. an account was deleted): an error-colored confirmation.
+     */
+    public Component danger(Locale locale, String key, Object... args) {
+        return ICON_DANGER.append(line(locale, ERROR_COLOR, key, args));
     }
 
     public Component negative(Locale locale, String key, Object... args) {
-        return ICON_NEGATIVE.append(line(locale, TextFormat.NEGATIVE_COLOR, key, args));
+        return ICON_NEGATIVE.append(line(locale, ERROR_COLOR, key, args));
     }
 
     public Component info(Locale locale, String key, Object... args) {
-        return line(locale, TextFormat.BASE_COLOR, key, args);
+        return MARK.append(line(locale, MAIN_COLOR, key, args));
     }
 
     public Component warning(Locale locale, String key, Object... args) {
-        return ICON_WARNING.append(line(locale, TextFormat.WARNING_COLOR, key, args));
+        return ICON_WARNING.append(line(locale, WARNING_COLOR, key, args));
     }
 
     private @Nullable String find(Locale locale, String key) {

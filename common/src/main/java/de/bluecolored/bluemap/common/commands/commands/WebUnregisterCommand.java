@@ -75,7 +75,7 @@ public class WebUnregisterCommand {
         }
 
         return lines(
-                messages.positive(locale, "unregister.done", playerName),
+                messages.danger(locale, "unregister.done", playerName),
                 messages.info(locale, "unregister.done-hint", "/bluemap webregister")
         );
     }

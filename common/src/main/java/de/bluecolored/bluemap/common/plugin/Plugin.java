@@ -49,6 +49,7 @@ import de.bluecolored.bluemap.common.rendermanager.TileUpdateStrategy;
 import de.bluecolored.bluemap.common.rendermanager.serialization.BmMapAdapter;
 import de.bluecolored.bluemap.common.rendermanager.serialization.RenderTaskAdapter;
 import de.bluecolored.bluemap.common.rendermanager.serialization.Vector2iAdapter;
+import de.bluecolored.bluemap.common.serverinterface.Player;
 import de.bluecolored.bluemap.common.serverinterface.Server;
 import de.bluecolored.bluemap.common.serverinterface.ServerEventListener;
 import de.bluecolored.bluemap.common.serverinterface.ServerWorld;
@@ -403,7 +404,7 @@ public class Plugin implements ServerEventListener {
                         webRequestHandler.register(
                                 "api/auth/(.*)",
                                 "$1",
-                                new AuthRequestHandler(this.webAuth, sessionManager, this.chatEnabled)
+                                new AuthRequestHandler(this.webAuth, sessionManager, this.chatEnabled, this::findOnlinePlayerName)
                         );
                     }
 
@@ -459,8 +460,9 @@ public class Plugin implements ServerEventListener {
                 renderManager = new RenderManager();
 
                 //update webapp and settings
+                boolean webappUpdated = false;
                 if (webappConfig.isEnabled())
-                    blueMap.createOrUpdateWebApp(false);
+                    webappUpdated = blueMap.createOrUpdateWebApp(false);
 
                 //start skin updater
                 this.skinUpdater = new PlayerSkinUpdater(this);
@@ -582,6 +584,13 @@ public class Plugin implements ServerEventListener {
 
                 //done
                 loaded = true;
+
+                // tell the operator once the server has finished loading, so the message is not lost
+                // between all the other startup logs
+                if (webappUpdated) {
+                    String message = "The web-app files have been updated to version " + BlueMap.VERSION + ".";
+                    serverInterface.runTask(() -> Logger.global.logInfo(message));
+                }
             }
         } catch (ConfigurationException ex) {
             Logger.global.logWarning(ex.getFormattedExplanation());
@@ -961,6 +970,23 @@ public class Plugin implements ServerEventListener {
             mapRequestHandler.broadcastChat(chatMessage);
         }
 
+        return null;
+    }
+
+    /**
+     * Resolves the name of an online player, ignoring the case. Used to store the original spelling
+     * of the name for web-accounts that were created before that was tracked.
+     *
+     * @param playerName the name to look up
+     * @return the name the player currently uses, or {@code null} if that player is not online
+     */
+    private @Nullable String findOnlinePlayerName(String playerName) {
+        if (playerName == null || playerName.isBlank()) return null;
+
+        for (Player player : serverInterface.getOnlinePlayers().values()) {
+            String name = player.getName().toPlainString();
+            if (name.equalsIgnoreCase(playerName)) return name;
+        }
         return null;
     }
 

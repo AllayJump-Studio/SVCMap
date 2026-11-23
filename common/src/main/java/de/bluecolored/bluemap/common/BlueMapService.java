@@ -91,13 +91,21 @@ public class BlueMapService implements Closeable {
         return webFilesManager;
     }
 
-    public synchronized void createOrUpdateWebApp(boolean force) throws ConfigurationException {
+    /**
+     * Extracts the bundled web-app files into the webroot if needed and writes {@code settings.json}.
+     *
+     * @param force {@code true} to always replace the web-app files
+     * @return {@code true} if the web-app files were (re-)extracted, {@code false} if they were up to date
+     */
+    public synchronized boolean createOrUpdateWebApp(boolean force) throws ConfigurationException {
+        boolean updated = false;
         try {
             WebFilesManager webFilesManager = getWebFilesManager();
 
             // update web-app files
             if (force || webFilesManager.filesNeedUpdate()) {
                 webFilesManager.updateFiles();
+                updated = true;
             }
 
             // update settings.json
@@ -111,6 +119,7 @@ public class BlueMapService implements Closeable {
             }
             webFilesManager.saveSettings();
 
+            return updated;
         } catch (IOException ex) {
             throw new ConfigurationException("Failed to update web-app files!", ex);
         }

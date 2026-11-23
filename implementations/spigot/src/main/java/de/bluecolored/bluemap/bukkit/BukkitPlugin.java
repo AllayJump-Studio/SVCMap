@@ -212,6 +212,16 @@ public class BukkitPlugin extends JavaPlugin implements Server, Listener {
         return true;
     }
 
+    @Override
+    public void runTask(Runnable task) {
+        try {
+            getServer().getScheduler().runTask(this, task);
+        } catch (RuntimeException ex) {
+            // servers without a bukkit scheduler (e.g. folia) run the task right away
+            task.run();
+        }
+    }
+
 
     @Override
     public boolean hasPermission(UUID playerUuid, String permission) {

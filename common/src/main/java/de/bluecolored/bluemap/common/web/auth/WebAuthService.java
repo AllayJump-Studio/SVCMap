@@ -108,6 +108,26 @@ public class WebAuthService {
     }
 
     /**
+     * Stores the original spelling of the player name, so an account that was created before that
+     * field existed (or before the player changed their name) can be displayed correctly.
+     * <p>Does not write the file, a following {@link #recordLogin(String)} persists the change.</p>
+     *
+     * @param playerName the account name
+     * @param onlineName the name the player currently uses in-game, or {@code null} if unknown
+     */
+    public void updateDisplayName(String playerName, @Nullable String onlineName) {
+        if (onlineName == null || onlineName.isBlank()) return;
+
+        WebAccount account = store.getAccount(normalizeName(playerName));
+        if (account == null) return;
+
+        String displayName = onlineName.trim();
+        if (displayName.equals(account.getPlayerName())) return;
+
+        account.setPlayerName(displayName);
+    }
+
+    /**
      * Verifies a player-name/password pair. Uses a constant-time hash comparison and never
      * tells the caller *why* it failed.
      */

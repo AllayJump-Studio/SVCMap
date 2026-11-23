@@ -159,6 +159,17 @@ public interface Server {
 
 
     /**
+     * Runs a task as soon as the server has finished what it is currently doing, e.g. the rest of
+     * the startup. Used to print messages that should not be buried between the other startup logs.
+     * <p>Falls back to running the task right away if the implementation can not schedule tasks.</p>
+     *
+     * @param task the task to run
+     */
+    default void runTask(Runnable task) {
+        task.run();
+    }
+
+    /**
      * Checks a permission for a player, which does not have to be online.
      *
      * @param playerUuid the uuid of the player

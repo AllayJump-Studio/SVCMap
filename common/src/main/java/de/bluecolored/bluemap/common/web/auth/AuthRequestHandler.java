@@ -41,6 +41,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.Function;
 
 /**
  * The login/registration endpoints of the webapp.
@@ -58,12 +59,26 @@ public class AuthRequestHandler implements HttpRequestHandler {
     private final WebAuthService auth;
     private final WebSessionManager sessions;
     private final boolean chatAvailable;
+    private final Function<String, String> onlinePlayerName;
     private final Map<String, FailureWindow> failures = new ConcurrentHashMap<>();
 
-    public AuthRequestHandler(WebAuthService auth, WebSessionManager sessions, boolean chatAvailable) {
+    /**
+     * @param auth the account store
+     * @param sessions the session manager
+     * @param chatAvailable whether web-chat is available, told to the webapp
+     * @param onlinePlayerName resolves the name of an online player, used to store the original
+     *                         spelling for accounts that do not know it yet
+     */
+    public AuthRequestHandler(
+            WebAuthService auth,
+            WebSessionManager sessions,
+            boolean chatAvailable,
+            Function<String, String> onlinePlayerName
+    ) {
         this.auth = auth;
         this.sessions = sessions;
         this.chatAvailable = chatAvailable;
+        this.onlinePlayerName = onlinePlayerName;
     }
 
     @Override
@@ -135,9 +150,14 @@ public class AuthRequestHandler implements HttpRequestHandler {
         }
 
         failures.remove(failureKey);
-        auth.recordLogin(username);
 
         String accountName = WebAuthService.normalizeName(username);
+
+        // accounts created before the display-name field existed show the lower-cased name, so we
+        // pick up the original spelling while the player is online and persist it with the login
+        auth.updateDisplayName(accountName, onlinePlayerName.apply(accountName));
+        auth.recordLogin(accountName);
+
         String token = sessions.createSession(accountName, remember);
 
         JsonObject result = new JsonObject();

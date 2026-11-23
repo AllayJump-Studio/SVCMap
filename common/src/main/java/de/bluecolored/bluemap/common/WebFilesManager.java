@@ -27,12 +27,14 @@ package de.bluecolored.bluemap.common;
 import com.google.gson.FieldNamingPolicy;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
+import com.google.gson.JsonParseException;
 import de.bluecolored.bluemap.common.config.MapConfig;
 import de.bluecolored.bluemap.common.config.WebappConfig;
 import de.bluecolored.bluemap.core.BlueMap;
 import de.bluecolored.bluemap.core.logger.Logger;
 import de.bluecolored.bluemap.core.resources.adapter.ResourcesGson;
 import de.bluecolored.bluemap.core.util.FileHelper;
+import org.jetbrains.annotations.Nullable;
 
 import java.io.*;
 import java.net.URL;
@@ -68,6 +70,10 @@ public class WebFilesManager {
     }
 
     public void saveSettings() throws IOException {
+        // the version marks which web-app files are deployed in the webroot, so it always has to be
+        // the current one - otherwise filesNeedUpdate() would try to update them on every start
+        this.settings.version = BlueMap.VERSION;
+
         FileHelper.createDirectories(getSettingsFile().getParent());
         try (BufferedWriter writer = Files.newBufferedWriter(getSettingsFile(),
                 StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING)) {
@@ -103,8 +109,38 @@ public class WebFilesManager {
                 .forEach(this.settings.maps::add);
     }
 
+    /**
+     * Checks if the web-app files in the webroot have to be (re-)extracted: either because there
+     * are none at all, or because they belong to a different BlueMap version.
+     */
     public boolean filesNeedUpdate() {
-        return !Files.exists(webRoot.resolve("index.html"));
+        if (!Files.exists(webRoot.resolve("index.html"))) return true;
+        return isWebappOutdated();
+    }
+
+    /**
+     * Checks if the deployed web-app files belong to a different version than this BlueMap build.
+     */
+    public boolean isWebappOutdated() {
+        String deployed = getDeployedVersion();
+        return deployed == null || !BlueMap.VERSION.equals(deployed);
+    }
+
+    /**
+     * The version of the web-app files that are currently deployed, read from {@code settings.json},
+     * or {@code null} if that can not be determined.
+     */
+    private @Nullable String getDeployedVersion() {
+        Path file = getSettingsFile();
+        if (!Files.exists(file)) return null;
+
+        try (BufferedReader reader = Files.newBufferedReader(file)) {
+            Settings settings = GSON.fromJson(reader, Settings.class);
+            return settings == null ? null : settings.version;
+        } catch (IOException | JsonParseException ex) {
+            Logger.global.logDebug("Failed to read the version of the deployed web-app: " + ex);
+            return null;
+        }
     }
 
     public void updateFiles() throws IOException {
